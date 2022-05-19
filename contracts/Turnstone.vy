@@ -38,6 +38,7 @@ def __init__(turnstone_id: bytes32, validators: DynArray[address, MAX_VALIDATORS
         cumulative_power += powers[i]
         if cumulative_power >= POWER_THRESHOLD:
             break
+        i += 1
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     valset_args: ValsetArgs = ValsetArgs({validators: validators, powers: powers, nonce: 0})
     self.last_valset_nonce = 0
@@ -65,6 +66,7 @@ def check_validator_signatures(current_valset: ValsetArgs, sigs: DynArray[Signat
             cumulative_power += current_valset.powers[i]
             if cumulative_power >= POWER_THRESHOLD:
                 break
+        i += 1
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
 
 @internal
@@ -81,6 +83,7 @@ def update_valset(new_valset: ValsetArgs, current_valset: ValsetArgs, sigs: DynA
         cumulative_power += new_valset.powers[i]
         if cumulative_power >= POWER_THRESHOLD:
             break
+        i += 1
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     assert self.last_checkpoint == self.make_checkpoint(current_valset), "Incorrect Checkpoint"
     new_checkpoint: bytes32 = self.make_checkpoint(new_valset)
