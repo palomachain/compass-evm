@@ -72,7 +72,7 @@ def check_validator_signatures(current_valset: ValsetArgs, sigs: DynArray[Signat
 @internal
 @view
 def make_checkpoint(valset_args: ValsetArgs) -> bytes32:
-    return keccak256(_abi_encode(valset_args.validators, valset_args.powers, valset_args.nonce, TURNSTONE_ID, method_id=method_id("checkpoint(address[],uint256[],uint256,uint256)")))
+    return keccak256(_abi_encode(valset_args.validators, valset_args.powers, valset_args.nonce, TURNSTONE_ID, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
 
 @external
 def update_valset(new_valset: ValsetArgs, current_valset: ValsetArgs, sigs: DynArray[Signature, MAX_VALIDATORS]):
