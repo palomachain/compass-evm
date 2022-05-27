@@ -8,7 +8,7 @@ from eth_account.messages import encode_defunct
 
 @pytest.fixture(scope="module")
 def TurnstoneContract(validators, powers):
-    return Turnstone.deploy(bstring2bytes32(b"ETH_01"), validators, powers, {"from": accounts[0]})
+    return Turnstone.deploy(bstring2bytes32(b"ETH_01"), [validators, powers, 0], {"from": accounts[0]})
 
 @pytest.fixture(scope="module")
 def TestERC20Contract():

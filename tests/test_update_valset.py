@@ -15,4 +15,4 @@ def test_update_valset(TurnstoneContract, validators, powers, accounts):
         [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
         {"from": accounts[0]}
     )
-    assert TurnstoneContract.last_valset_id() == new_valset_id
+    assert TurnstoneContract.last_checkpoint() == hash.hex()

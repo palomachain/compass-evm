@@ -10,7 +10,7 @@ def test_submit_batch_call(TurnstoneContract, TestERC20Contract, validators, pow
     args = []
     enc_abi = encode_abi(["address", "uint256"], [accounts[2].address, 10 ** 17])
     args.append([TestERC20Contract.address, func_sig + enc_abi])
-    enc_abi = encode_abi(["address", "uint256"], [accounts[3].address, 10 ** 17])
+    enc_abi = encode_abi(["address", "uint256"], [accounts[3].address, 2 * 10 ** 17])
     args.append([TestERC20Contract.address, func_sig + enc_abi])
 
     func_sig = function_signature("batch_logic_call((address,bytes)[],uint256,uint256)")
@@ -22,4 +22,4 @@ def test_submit_batch_call(TurnstoneContract, TestERC20Contract, validators, pow
         {"from": accounts[0]}
     )
     assert TestERC20Contract.balanceOf(accounts[2]) == 10 ** 17
-    assert TestERC20Contract.balanceOf(accounts[3]) == 10 ** 17
+    assert TestERC20Contract.balanceOf(accounts[3]) == 2 * 10 ** 17
