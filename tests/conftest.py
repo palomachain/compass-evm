@@ -6,11 +6,11 @@ from eth_abi import encode_abi
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def TurnstoneContract(validators, powers):
     return Turnstone.deploy(bstring2bytes32(b"ETH_01"), [validators, powers, 0], {"from": accounts[0]})
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def TestERC20Contract():
     return TestERC20.deploy("TestERC20", "T20", 10 ** 18, {"from": accounts[0]})
 
