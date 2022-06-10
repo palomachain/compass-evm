@@ -37,6 +37,7 @@ event LogicCallEvent:
     message_id: uint256
 
 last_checkpoint: public(bytes32)
+last_valset_id: public(uint256)
 message_id_used: public(HashMap[uint256, bool])
 
 # turnstone_id: unique identifier for turnstone instance
@@ -122,6 +123,7 @@ def update_valset(new_valset: Valset, consensus: Consensus):
     # check if enough validators signed new validator set (new checkpoint)
     self.check_validator_signatures(consensus, new_checkpoint)
     self.last_checkpoint = new_checkpoint
+    self.last_valset_id = new_valset.valset_id
     log ValsetUpdated(new_checkpoint, new_valset.valset_id)
 
 # This makes calls to contracts that execute arbitrary logic

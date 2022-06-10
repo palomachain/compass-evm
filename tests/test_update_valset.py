@@ -16,6 +16,7 @@ def test_update_valset_success(TurnstoneContract, validators, powers, accounts):
         {"from": accounts[0]}
     )
     assert TurnstoneContract.last_checkpoint() == hash.hex()
+    assert TurnstoneContract.last_valset_id == new_valset_id
 
 def test_update_valset_invalid_valset_id_revert(TurnstoneContract, validators, powers, accounts):
     func_sig = function_signature("checkpoint(address[],uint256[],uint256,bytes32)")
