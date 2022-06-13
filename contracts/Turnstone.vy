@@ -4,7 +4,8 @@
 @author Volume.Finance
 """
 
-MAX_VALIDATORS: constant(uint256) = 128
+MAX_VALIDATORS: constant(uint256) = 320
+MAX_PAYLOAD: constant(uint256) = 20480
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
 TURNSTONE_ID: immutable(bytes32)
@@ -25,7 +26,7 @@ struct Consensus:
 
 struct LogicCallArgs:
     logic_contract_address: address # the arbitrary contract address to external call
-    payload: Bytes[1024] # payloads
+    payload: Bytes[MAX_PAYLOAD] # payloads
 
 event ValsetUpdated:
     checkpoint: bytes32
@@ -33,7 +34,7 @@ event ValsetUpdated:
 
 event LogicCallEvent:
     logic_contract_address: address
-    payload: Bytes[1024]
+    payload: Bytes[MAX_PAYLOAD]
     message_id: uint256
 
 last_checkpoint: public(bytes32)
