@@ -50,16 +50,13 @@ The payload data should be less than 1024 bytes.
 
 ## Events
 
-We emit 3 different events, each of which has a distinct purpose. 2 of these events contain a field called _eventNonce, which is used by the Paloma chain to ensure that the events are not out of order. This is incremented each time one of the events is emitted.
+We emit 2 different events, each of which has a distinct purpose. One contains a field called message_id, which is used by the Paloma chain to ensure that the events are not out of order. This should updated each time one of the events is emitted.
+The other one emits valset_id and checkpoint when valset_id is updated.
 
-### TransactionBatchExecutedEvent
+### LogicCallEvent
 
-This contains information about a batch that has been successfully processed. It contains the batch id and the ERC20 token. The Paloma chain can identify the batch from this information. It also contains the _eventNonce.
+This contains information about a logic_call transaction that has been successfully processed. It contains the message_id and the logic_contract address, and payload data. The Paloma chain can identify the transaction from this information.
 
-### SendToCosmosEvent
-
-This is emitted every time someone sends tokens to the contract to be bridged to the Paloma chain. It contains all information neccesary to credit the tokens to the correct Cosmos account, as well as the _eventNonce.
-
-### ValsetUpdatedEvent
+### ValsetUpdated
 
 This is emitted whenever the valset is updated. It does not contain the _eventNonce, since it is never brought into the Paloma state. It is used by relayers when they call submit_logic_call or update_valset, so that they can include the correct validator signatures with the transaction.
