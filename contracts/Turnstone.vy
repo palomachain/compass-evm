@@ -55,6 +55,7 @@ def __init__(turnstone_id: bytes32, valset: Valset):
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, turnstone_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
+    log ValsetUpdated(new_checkpoint, valset.valset_id)
 
 @external
 @pure
