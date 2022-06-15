@@ -13,8 +13,9 @@ def test_submit_logic_call_success(TurnstoneContract, TestERC20Contract, validat
     payload = func_sig + enc_abi
     message_id = 1000
     valset_id = 0
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, 2 ** 256 - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, 2 ** 256 - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     TurnstoneContract.submit_logic_call(
@@ -33,8 +34,9 @@ def test_submit_logic_call_timeout_revert(TurnstoneContract, TestERC20Contract, 
     valset_id = 0
     chain = Chain()
     timestamp = chain.time()
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, timestamp - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, timestamp - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     with brownie.reverts("Timeout"):
@@ -51,8 +53,9 @@ def test_submit_logic_call_used_message_id_revert(TurnstoneContract, TestERC20Co
     payload = func_sig + enc_abi
     message_id = 1000
     valset_id = 0
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, 2 ** 256 - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, 2 ** 256 - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     TurnstoneContract.submit_logic_call(
@@ -73,8 +76,9 @@ def test_submit_logic_call_incorrect_checkpoint_revert(TurnstoneContract, TestER
     payload = func_sig + enc_abi
     message_id = 1000
     valset_id = 0
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, 2 ** 256 - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, 2 ** 256 - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     powers[0] -= 1
@@ -92,8 +96,9 @@ def test_submit_logic_call_invalid_signature(TurnstoneContract, TestERC20Contrac
     payload = func_sig + enc_abi
     message_id = 1000
     valset_id = 0
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, 2 ** 256 - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, 2 ** 256 - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     sigs[0][0] = 1
@@ -111,8 +116,9 @@ def test_submit_logic_call_insufficient_power(TurnstoneContract, TestERC20Contra
     payload = func_sig + enc_abi
     message_id = 1000
     valset_id = 0
-    func_sig = function_signature("logic_call((address,bytes),uint256,uint256)")
-    enc_abi = encode_abi(["(address,bytes)", "uint256", "uint256"], [[TestERC20Contract.address, payload], message_id, 2 ** 256 - 1])
+    func_sig = function_signature("logic_call((address,bytes),uint256,bytes32,uint256)")
+    turnstone_id = bstring2bytes32(b"ETH_01")
+    enc_abi = encode_abi(["(address,bytes)", "uint256", "bytes32", "uint256"], [[TestERC20Contract.address, payload], message_id, turnstone_id, 2 ** 256 - 1])
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     sigs[0][0] = 0

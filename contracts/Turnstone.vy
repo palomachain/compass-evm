@@ -136,7 +136,7 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uin
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, deadline, method_id=method_id("logic_call((address,bytes),uint256,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, TURNSTONE_ID, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
