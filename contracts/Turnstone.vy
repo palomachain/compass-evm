@@ -103,7 +103,7 @@ def make_checkpoint(valset: Valset) -> bytes32:
 # valset: new validator set to update with
 # consensus: current validator set and signatures
 @external
-def update_valset(new_valset: Valset, consensus: Consensus):
+def update_valset(consensus: Consensus, new_valset: Valset):
     # check if new valset_id is greater than current valset_id
     assert new_valset.valset_id > consensus.valset.valset_id, "Invalid Valset ID"
     cumulative_power: uint256 = 0

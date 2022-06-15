@@ -11,8 +11,8 @@ def test_update_valset_success(TurnstoneContract, validators, powers, accounts):
     hash = web3.keccak(func_sig + enc_abi)
     sigs = sign_hash(validators, hash)
     TurnstoneContract.update_valset(
-        [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
         [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
+        [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
         {"from": accounts[0]}
     )
     assert TurnstoneContract.last_checkpoint() == hash.hex()
@@ -25,8 +25,8 @@ def test_update_valset_invalid_valset_id_revert(TurnstoneContract, validators, p
     sigs = sign_hash(validators, hash)
     with brownie.reverts("Invalid Valset ID"):
         TurnstoneContract.update_valset(
-            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
+            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             {"from": accounts[0]}
         )
 
@@ -39,8 +39,8 @@ def test_update_valset_invalid_signature_revert(TurnstoneContract, validators, p
     sigs[0][0] = 1
     with brownie.reverts("Invalid Signature"):
         TurnstoneContract.update_valset(
-            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id + 1],
             [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
+            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id + 1],
             {"from": accounts[0]}
         )
 
@@ -53,8 +53,8 @@ def test_update_valset_incorrect_checkpoint_revert(TurnstoneContract, validators
     powers[0] += 1
     with brownie.reverts("Incorrect Checkpoint"):
         TurnstoneContract.update_valset(
-            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
+            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             {"from": accounts[0]}
         )
 
@@ -68,7 +68,7 @@ def test_update_valset_insufficient_power_revert(TurnstoneContract, validators, 
     sigs[1][0] = 0
     with brownie.reverts("Insufficient Power"):
         TurnstoneContract.update_valset(
-            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             [[[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, 0], sigs],
+            [[validators[0].address, validators[1].address, validators[2].address, validators[3].address], powers, new_valset_id],
             {"from": accounts[0]}
         )
