@@ -1,4 +1,4 @@
-# Turnstone-evm
+# Compass-evm
 
 This smart contract is to make possible to run any other smart contract with arbitrary transaction data.
 
