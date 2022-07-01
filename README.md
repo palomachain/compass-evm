@@ -6,16 +6,16 @@ This is written in Vyper.
 
 Usage example:
 
-- You send 25 DAI to the Turnstone contract, specifying which address on the Paloma chain should recieve the syntehtic DAI.
-- Validators on the Paloma chain see that this has happened and mint 25 synthetic DAI for the address you specified on the Paloma chain.
+- You send 25 DAI to the Compass-EVM contract, specifying which address on the Paloma chain should recieve the syntehtic DAI.
+- Validators on the Paloma blockchain see that this has happened and mint 25 synthetic DAI for the address you specified on the Paloma chain.
 - You send the 25 synthetic DAI to Jim on the Paloma chain.
-- Jim sends the synthetic DAI to Turnstone module on the Paloma chain, specifying which Ethereum address should receive it.
-- The Paloma validators burn the synthetic DAI on the Paloma chain and unlock 25 DAI for Jim on Ethereum
+- Jim sends the synthetic DAI to Turnstone module on the Paloma blockchain, specifying which Ethereum address should receive it.
+- The Paloma validators burn the synthetic DAI on the Paloma blockchain and unlock 25 DAI for Jim on Ethereum
 
 ## Security model
 
-The Turnstone contract is basically a multisig with a few tweaks. Even though it is designed to be used with a consensus process on Paloma, the Turnstone contract itself encodes nothing about this consensus process. There are three main operations- update_valset, submit_logic_call.
-- update_valset updates the signers on the multisig, and their relative powers. This mirrors the validator set on the Paloma chain, so that all the Paloma validators are signers, in proportion to their staking power on the Paloma chain. An update_valset transaction must be signed by 2/3's of the current valset to be accepted.
+The Compass-EVM contract is basically a validator-set multisig with a few tweaks. Even though it is designed to be used with a consensus process on Paloma, the Compass-EVM contract itself encodes nothing about this consensus process. There are three main operations- update_valset, submit_logic_call.
+- update_valset updates the signers on the multisig, and their relative powers. This mirrors the validator set on the Paloma blockchain, so that all the Paloma validators are signers, in proportion to their staking power on the Paloma chain. An update_valset transaction must be signed by 2/3's of the current valset to be accepted.
 - submit_logic_call is used to submit a arbitrary transactions to another smart contract. The logic call must be signed by 2/3's of the current valset.
 
 ### update_valset
@@ -36,11 +36,11 @@ At this point, all of the checks are complete, and it's time to update the valse
 
 ### submit_logic_call
 
-This is how the turnstone run the arbitrary transaction to the other smart contract.
+This is how the Compass-EVM run the arbitrary transaction to the other smart contract.
 
 We start with some of the same checks that are done in update_valset- checking the supplied current valset against the checkpoint.
 
-We also check if the message_id is used. This stores an id for each ERC20 handled by Turnstone. The purpose of this id is to ensure that old logic call cannot be submitted again. It is also used on the Paloma chain to clean up old batches that were never submitted and whose id is now too low to ever submit.
+We also check if the message_id is used. This stores an id for each ERC20 handled by Compass-EVM. The purpose of this id is to ensure that old logic call cannot be submitted again. It is also used on the Paloma chain to clean up old batches that were never submitted and whose id is now too low to ever submit.
 
 We check the current validator's signatures over the hash of the logic call, using the same method used above to check their signatures over a new valset.
 
