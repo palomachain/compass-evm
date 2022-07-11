@@ -32,7 +32,7 @@ def get_valset(node, valset_id=None):
     # print(stdout)
 
     valset = json.loads(stdout)
-    valset = valset.valset
+    valset = valset["valset"]
     print(valset)
     # validators are strings returned like this: "0xabcd...."
     return valset.validators, valset.powers, valset.valsetID
