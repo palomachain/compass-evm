@@ -35,7 +35,7 @@ def get_valset(node, valset_id=None):
     valset = valset["valset"]
     print(valset)
     # validators are strings returned like this: "0xabcd...."
-    return valset.validators, valset.powers, valset.valsetID
+    return valset["validators"], valset["powers"], valset["valsetID"]
 
 
 def main():
@@ -48,7 +48,7 @@ def main():
 
     assert power_sum >= 2863311530, f"not enough power to reach consensus: {power_sum}"
 
-    acct = accounts.load("deployer_account")
+    acct = accounts[0]
     turnstone_id = b""  # should update
     Turnstone.deploy(
         encode_abi(["bytes32"], [turnstone_id]),
