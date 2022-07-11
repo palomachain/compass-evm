@@ -25,11 +25,11 @@ def get_valset(node, valset_id=None):
     )
 
     stdout, stderr = process.communicate()
-    print(stdout)
-    stdout = str(stdout)
-    stderr = str(stderr)
+    # print(stdout)
+    # stdout = str(stdout)
+    # stderr = str(stderr)
 
-    print(stdout)
+    # print(stdout)
 
     valset = json.loads(stdout)
     print(valset)
