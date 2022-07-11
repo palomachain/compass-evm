@@ -6,7 +6,7 @@ from brownie import Turnstone, accounts
 from eth_abi import encode_abi
 
 
-def get_valset(node, valset_id):
+def get_valset(node, valset_id=None):
     process = subprocess.Popen(
         [
             "palomad",
