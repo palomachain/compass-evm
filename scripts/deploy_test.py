@@ -38,8 +38,9 @@ def get_valset(node, valset_id=None):
 
 
 def main():
-    node = sys.argv[1]
-    assert node, "must provide 1 argument which is the node: e.g. tcp://localhost:26657"
+    # node = sys.argv[1]
+    # assert node, "must provide 1 argument which is the node: e.g. tcp://localhost:26657"
+    node = "tcp://localhost:26657"
     validators, powers, valset_id = get_valset(node)
 
     power_sum = sum(powers)
