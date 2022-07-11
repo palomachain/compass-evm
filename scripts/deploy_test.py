@@ -44,9 +44,9 @@ def main():
     node = "tcp://localhost:26657"
     validators, powers, valset_id = get_valset(node)
 
-    power_sum = sum(powers)
+    # power_sum = sum(powers)
 
-    assert power_sum >= 2863311530, f"not enough power to reach consensus: {power_sum}"
+    # assert power_sum >= 2863311530, f"not enough power to reach consensus: {power_sum}"
 
     acct = accounts[0]
     turnstone_id = b""  # should update
