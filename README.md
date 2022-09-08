@@ -6,7 +6,7 @@ This is written in Vyper.
 
 Usage example:
 
-- You send 25 DAI to the Compass-EVM contract, specifying which address on the Paloma chain should recieve the syntehtic DAI.
+- You send 25 DAI to the Compass-EVM contract, specifying which address on the Paloma chain should recieve the synthetic DAI.
 - Validators on the Paloma blockchain see that this has happened and mint 25 synthetic DAI for the address you specified on the Paloma chain.
 - You send the 25 synthetic DAI to Jim on the Paloma chain.
 - Jim sends the synthetic DAI to Turnstone module on the Paloma blockchain, specifying which Ethereum address should receive it.
