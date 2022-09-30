@@ -6,6 +6,7 @@
 
 MAX_VALIDATORS: constant(uint256) = 320
 MAX_PAYLOAD: constant(uint256) = 20480
+MAX_ADDRESSES_TO_PAY: constant(uint256) = 100
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
 TURNSTONE_ID: immutable(bytes32)
@@ -28,6 +29,10 @@ struct LogicCallArgs:
     logic_contract_address: address # the arbitrary contract address to external call
     payload: Bytes[MAX_PAYLOAD] # payloads
 
+struct SendCoinsArgs:
+    addresses: DynArray[address, MAX_ADDRESSES_TO_PAY]
+    amounts: DynArray[uint256, MAX_ADDRESSES_TO_PAY]
+
 event ValsetUpdated:
     checkpoint: bytes32
     valset_id: uint256
@@ -36,6 +41,11 @@ event LogicCallEvent:
     logic_contract_address: address
     payload: Bytes[MAX_PAYLOAD]
     message_id: uint256
+
+event AddedFundsForJobEvent:
+    job_id: bytes32
+    amount: uint256
+    from: address
 
 last_checkpoint: public(bytes32)
 message_id_used: public(HashMap[uint256, bool])
@@ -142,3 +152,21 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uin
     # make call to logic contract
     raw_call(args.logic_contract_address, args.payload)
     log LogicCallEvent(args.logic_contract_address, args.payload, message_id)
+
+@external
+@payable
+def fund_job(job_id: bytes32):
+    log AddedFundsForJob(job_id, msg.value, msg.sender)
+
+@external
+def send_coins(consensus: Consensus, args: SendCoinsArgs):
+    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(args, TURNSTONE_ID, method_id=method_id("send_coins((address,uint256),uint256)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+    i: uint256 = 0
+    for address in args.addresses:
+        amount = args.amounts[i]
+	i+=1
+	self.send(address, amount)
