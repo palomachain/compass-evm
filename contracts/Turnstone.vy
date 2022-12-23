@@ -1,4 +1,4 @@
-# @version 0.3.3
+# @version 0.3.7
 """
 @title Turnstone-EVM
 @author Volume.Finance
@@ -37,6 +37,10 @@ event LogicCallEvent:
     payload: Bytes[MAX_PAYLOAD]
     message_id: uint256
 
+event Valset_element:
+    validator_address: address
+    validator_power: uint256
+
 last_checkpoint: public(bytes32)
 message_id_used: public(HashMap[uint256, bool])
 
@@ -47,6 +51,10 @@ def __init__(turnstone_id: bytes32, valset: Valset):
     TURNSTONE_ID = turnstone_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
+    for validator in valset.validators:
+        log Valset_element(valset.validators[i], valset.powers[i])
+        i += 1
+    i = 0
     # check cumulative power is enough
     for validator in valset.validators:
         cumulative_power += valset.powers[i]
