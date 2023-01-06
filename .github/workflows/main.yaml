@@ -27,7 +27,7 @@ jobs:
       uses: actions/setup-node@v3
 
     - name: Install Ganache
-      run: npm install -g ganache
+      run: npm install -g ganache@7.4.1
 
     - name: Setup Python 3.8
       uses: actions/setup-python@v4
@@ -36,7 +36,7 @@ jobs:
 
     - name: Install Requirements
       run: |
-        pip install eth-brownie==1.18.2
+        pip install eth-brownie==1.19.1
         pip install vyper
 
     - name: Run Tests
