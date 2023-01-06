@@ -27,10 +27,10 @@ jobs:
       uses: actions/setup-node@v3
 
     - name: Install Ganache
-      run: npm install -g ganache
+      run: npm install -g ganache@7.6.0
 
     - name: Setup Python 3.8
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: 3.8
 
