@@ -30,9 +30,9 @@ jobs:
       run: npm install -g ganache
 
     - name: Setup Python 3.8
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.8.5
+        python-version: 3.8.10
 
     - name: Install Requirements
       run: |
