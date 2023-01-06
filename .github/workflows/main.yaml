@@ -36,7 +36,7 @@ jobs:
 
     - name: Install Requirements
       run: |
-        pip install eth-brownie
+        pip install eth-brownie==1.19.1
         pip install vyper
 
     - name: Run Tests
