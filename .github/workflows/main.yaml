@@ -10,7 +10,7 @@ env:
 jobs:
 
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
@@ -32,11 +32,11 @@ jobs:
     - name: Setup Python 3.8
       uses: actions/setup-python@v4
       with:
-        python-version: 3.8.5
+        python-version: 3.8
 
     - name: Install Requirements
       run: |
-        pip install eth-brownie==1.19.1
+        pip install eth-brownie
         pip install vyper
 
     - name: Run Tests
