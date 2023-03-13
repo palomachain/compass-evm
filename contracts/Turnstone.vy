@@ -1,4 +1,4 @@
-# @version 0.3.3
+# @version 0.3.7
 """
 @title Turnstone-EVM
 @author Volume.Finance
@@ -38,6 +38,7 @@ event LogicCallEvent:
     message_id: uint256
 
 last_checkpoint: public(bytes32)
+last_valset_id: public(uint256)
 message_id_used: public(HashMap[uint256, bool])
 
 # turnstone_id: unique identifier for turnstone instance
@@ -56,6 +57,7 @@ def __init__(turnstone_id: bytes32, valset: Valset):
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, turnstone_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
+    self.last_valset_id = valset.valset_id
     log ValsetUpdated(new_checkpoint, valset.valset_id)
 
 @external
@@ -124,6 +126,7 @@ def update_valset(consensus: Consensus, new_valset: Valset):
     # check if enough validators signed new validator set (new checkpoint)
     self.check_validator_signatures(consensus, new_checkpoint)
     self.last_checkpoint = new_checkpoint
+    self.last_valset_id = new_valset.valset_id
     log ValsetUpdated(new_checkpoint, new_valset.valset_id)
 
 # This makes calls to contracts that execute arbitrary logic
