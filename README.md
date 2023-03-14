@@ -48,6 +48,22 @@ Now we are ready. We run the arbitrary transaction to the logic contract.
 
 The payload data should be less than 1024 bytes.
 
+### submit_batch
+
+This is how the bridge transfers tokens from addresses on the Paloma chain to addresses on the Ethereum chain. The validators sign batches of transactions that are submitted to the contract. Each transaction has a destination address, an amount, a message_id for whoever submitted the batch.
+
+We start with some of the same checks that are done in update_valset- checking that the lengths of the arrays match up, and checking the supplied current valset against the checkpoint.
+
+We also check the message_id against the message_id_used mapping.
+
+We check the current validator's signatures over the hash of the transaction batch, using the same method used above to check their signatures over a new valset.
+
+Now we are ready to make the transfers. We iterate over all the transactions in the batch and do the transfers.
+
+### send_token_to_paloma
+
+This is used to transfer tokens from an Ethereum address to a Paloma address. It is extremely simple, because everything really happens on the Paloma side. The transferred tokens are locked in the contract, then an event is emitted. The validators see this event and mint tokens on the Paloma side.
+
 ## Events
 
 We emit 2 different events, each of which has a distinct purpose. One contains a field called message_id, which is used by the Paloma chain to ensure that the events are not out of order. This should updated each time one of the events is emitted.
@@ -60,3 +76,11 @@ This contains information about a logic_call transaction that has been successfu
 ### ValsetUpdated
 
 This is emitted whenever the valset is updated. It does not contain the _eventNonce, since it is never brought into the Paloma state. It is used by relayers when they call submit_logic_call or update_valset, so that they can include the correct validator signatures with the transaction.
+
+### BatchSendEvent
+
+This contains information about a batch that has been successfully processed. It contains the ERC20 token and message_id. The Paloma chain can identify the batch from this information.
+
+### SendToPalomaEvent
+
+This is emitted every time someone sends tokens to the contract to be bridged to the Paloma chain. It contains all information necessary to credit the tokens to the correct Paloma account.

@@ -6,9 +6,13 @@
 
 MAX_VALIDATORS: constant(uint256) = 320
 MAX_PAYLOAD: constant(uint256) = 20480
+MAX_BATCH: constant(uint256) = 64
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
 TURNSTONE_ID: immutable(bytes32)
+
+interface ERC20:
+    def balanceOf(_owner: address) -> uint256: view
 
 struct Valset:
     validators: DynArray[address, MAX_VALIDATORS] # Validator addresses
@@ -28,6 +32,10 @@ struct LogicCallArgs:
     logic_contract_address: address # the arbitrary contract address to external call
     payload: Bytes[MAX_PAYLOAD] # payloads
 
+struct TokenSendArgs:
+    receiver: DynArray[address, MAX_BATCH]
+    amount: DynArray[uint256, MAX_BATCH]
+
 event ValsetUpdated:
     checkpoint: bytes32
     valset_id: uint256
@@ -35,6 +43,16 @@ event ValsetUpdated:
 event LogicCallEvent:
     logic_contract_address: address
     payload: Bytes[MAX_PAYLOAD]
+    message_id: uint256
+
+event SendToPalomaEvent:
+    token: address
+    sender: address
+    receiver: String[64]
+    amount: uint256
+
+event BatchSendEvent:
+    token: address
     message_id: uint256
 
 last_checkpoint: public(bytes32)
@@ -145,3 +163,55 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uin
     # make call to logic contract
     raw_call(args.logic_contract_address, args.payload)
     log LogicCallEvent(args.logic_contract_address, args.payload, message_id)
+
+@internal
+def _safe_transfer_from(_token: address, _from: address, _to: address, _value: uint256):
+    _response: Bytes[32] = raw_call(
+        _token,
+        _abi_encode(
+            _from, _to, _value,
+            method_id=method_id("transferFrom(address,address,uint256)")),
+        max_outsize=32
+    )  # dev: failed transferFrom
+    if len(_response) > 0:
+        assert convert(_response, bool), "TransferFrom failed"
+
+@external
+def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
+    _balance: uint256 = ERC20(token).balanceOf(self)
+    self._safe_transfer_from(token, msg.sender, self, amount)
+    _balance -= ERC20(token).balanceOf(self)
+    assert _balance > 0
+    log SendToPalomaEvent(token, msg.sender, receiver, amount)
+
+@internal
+def _safe_transfer(_token: address, _to: address, _value: uint256):
+    _response: Bytes[32] = raw_call(
+        _token,
+        _abi_encode(
+            _to, _value,
+            method_id=method_id("transfer(address,uint256)")),
+        max_outsize=32
+    )  # dev: failed transferFrom
+    if len(_response) > 0:
+        assert convert(_response, bool), "TransferFrom failed"
+
+@external
+def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, message_id: uint256, deadline: uint256):
+    assert block.timestamp <= deadline, "Timeout"
+    assert not self.message_id_used[message_id], "Used Message_ID"
+    length: uint256 = len(args.receiver)
+    assert length == len(args.amount)
+    self.message_id_used[message_id] = True
+    # check if the supplied current validator set matches the saved checkpoint
+    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, TURNSTONE_ID, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+    # make call to logic contract
+    for i in range(MAX_BATCH):
+        if  i >= length:
+            break
+        self._safe_transfer(token, args.receiver[i], args.amount[i])
+    log BatchSendEvent(token, message_id)
