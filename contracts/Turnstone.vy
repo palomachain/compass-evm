@@ -56,7 +56,7 @@ event BatchSendEvent:
     message_id: uint256
 
 event ERC20DeployedEvent:
-    cosmos_denom: String[64]
+    paloma_denom: String[64]
     token_contract: address
     name: String[64]
     symbol: String[32]
@@ -224,6 +224,6 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
     log BatchSendEvent(token, message_id)
 
 @external
-def deploy_erc20(_cosmos_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
+def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
     erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
-    log ERC20DeployedEvent(_cosmos_denom, erc20, _name, _symbol, _decimals)
+    log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals)

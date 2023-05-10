@@ -1,10 +1,10 @@
-from brownie import accounts, CosmosERC20
+from brownie import accounts, PalomaERC20
 from typing import Union
 
 
 def main():
     acct = accounts.load("deployer_account")
-    initcode = get_blueprint_initcode(CosmosERC20.bytecode)
+    initcode = get_blueprint_initcode(PalomaERC20.bytecode)
     acct.transfer(data=initcode)
 
 
