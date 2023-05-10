@@ -55,6 +55,13 @@ event BatchSendEvent:
     token: address
     message_id: uint256
 
+event ERC20DeployedEvent:
+    paloma_denom: String[64]
+    token_contract: address
+    name: String[64]
+    symbol: String[32]
+    decimals: uint8
+
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 message_id_used: public(HashMap[uint256, bool])
@@ -215,3 +222,8 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
             break
         self._safe_transfer(token, args.receiver[i], args.amount[i])
     log BatchSendEvent(token, message_id)
+
+@external
+def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
+    erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
+    log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals)
