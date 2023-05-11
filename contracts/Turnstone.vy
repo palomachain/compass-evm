@@ -225,5 +225,6 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
+    assert msg.sender == self, "Invalid"
     erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
     log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals)

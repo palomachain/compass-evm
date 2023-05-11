@@ -66,7 +66,7 @@ This is used to transfer tokens from an Ethereum address to a Paloma address. It
 
 ### deploy_erc20
 
-This is used to deploy erc20 from its blueprint to bridge between Paloma and Ethereum. The blueprint ERC20 token should have been deployed already using `deploy_blueprint.py` script. This ERC20 token can be managed by Compass-EVM. That means the token has minted maximum amount (2 ** 256 - 1) into Compass-EVM and can transfered from the Compass-EVM whenever it asked from Paloma side. But the token balance in Compass-EVM is not considered as minted externally because the total supply of the token is calculated just like `2 ** 256 - 1 - (token balance of Compass-EVM)`.
+This is used to deploy erc20 from its blueprint to bridge between Paloma and Ethereum. The blueprint ERC20 token should have been deployed already using `deploy_blueprint.py` script. This ERC20 token can be managed by Compass-EVM. That means the token has minted maximum amount (2 ** 256 - 1) into Compass-EVM and can transfered from the Compass-EVM whenever it asked from Paloma side. But the token balance in Compass-EVM is not considered as minted externally because the total supply of the token is calculated just like `2 ** 256 - 1 - (token balance of Compass-EVM)`. This can be run from submit_logic_call() to self address.
 
 ## Events
 
