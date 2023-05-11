@@ -79,4 +79,7 @@ def decreaseAllowance(_spender: address, _value: uint256) -> bool:
 def new_compass(_compass: address):
     assert msg.sender == self.compass
     self.compass = _compass
+    bal: uint256 = self.balanceOf[_compass]
+    self.balanceOf[_compass] = bal + self.balanceOf[msg.sender]
+    self.balanceOf[msg.sender] = 0
     log NewCompass(msg.sender, _compass)

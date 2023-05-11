@@ -64,6 +64,10 @@ Now we are ready to make the transfers. We iterate over all the transactions in 
 
 This is used to transfer tokens from an Ethereum address to a Paloma address. It is extremely simple, because everything really happens on the Paloma side. The transferred tokens are locked in the contract, then an event is emitted. The validators see this event and mint tokens on the Paloma side.
 
+### deploy_erc20
+
+This is used to deploy erc20 from its blueprint to bridge between Paloma and Ethereum. The blueprint ERC20 token should have been deployed already using `deploy_blueprint.py` script. This ERC20 token can be managed by Compass-EVM. That means the token has minted maximum amount (2 ** 256 - 1) into Compass-EVM and can transfered from the Compass-EVM whenever it asked from Paloma side. But the token balance in Compass-EVM is not considered as minted externally because the total supply of the token is calculated just like `2 ** 256 - 1 - (token balance of Compass-EVM)`.
+
 ## Events
 
 We emit 2 different events, each of which has a distinct purpose. One contains a field called message_id, which is used by the Paloma chain to ensure that the events are not out of order. This should updated each time one of the events is emitted.
