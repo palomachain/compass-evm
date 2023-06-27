@@ -79,7 +79,7 @@ def decreaseAllowance(_spender: address, _value: uint256) -> bool:
 
 @external
 def new_compass(_compass: address):
-    assert msg.sender == self.compass and _compass != msg.sender, "Not available"
+    assert msg.sender == self.compass and _compass != msg.sender and len(msg.data) == 68 and convert(slice(msg.data, 36, 32), bytes32) == convert(0, bytes32), "Not available" # Attached data should be 0x
     self.compass = _compass
     self.balanceOf[_compass] = unsafe_add(self.balanceOf[_compass], self.balanceOf[msg.sender])
     self.balanceOf[msg.sender] = 0
