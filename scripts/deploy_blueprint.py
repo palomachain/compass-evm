@@ -5,8 +5,8 @@ from typing import Union
 def main():
     acct = accounts.load("deployer_account")
     initcode = get_blueprint_initcode(PalomaERC20.bytecode)
-    acct.transfer(data=initcode)
-
+    tx = acct.transfer(data=initcode)
+    print(tx.contract_address)
 
 def get_blueprint_initcode(initcode: Union[str, bytes]):
     if isinstance(initcode, str):
