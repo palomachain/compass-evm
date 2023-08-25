@@ -187,7 +187,7 @@ def _safe_transfer_from(_token: address, _from: address, _to: address, _value: u
 def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     _balance: uint256 = ERC20(token).balanceOf(self)
     self._safe_transfer_from(token, msg.sender, self, amount)
-    _balance -= ERC20(token).balanceOf(self)
+    _balance = ERC20(token).balanceOf(self) - _balance
     assert _balance > 0
     log SendToPalomaEvent(token, msg.sender, receiver, amount)
 
