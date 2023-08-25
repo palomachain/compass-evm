@@ -188,7 +188,7 @@ def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     _balance: uint256 = ERC20(token).balanceOf(self)
     self._safe_transfer_from(token, msg.sender, self, amount)
     _balance = ERC20(token).balanceOf(self) - _balance
-    assert _balance > 0
+    assert _balance > 0, "Zero Transfer"
     log SendToPalomaEvent(token, msg.sender, receiver, amount)
 
 @internal
@@ -208,7 +208,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
     assert block.timestamp <= deadline, "Timeout"
     assert not self.message_id_used[message_id], "Used Message_ID"
     length: uint256 = len(args.receiver)
-    assert length == len(args.amount)
+    assert length == len(args.amount), "Unmatched Params"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
