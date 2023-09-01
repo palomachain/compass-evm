@@ -212,7 +212,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
+    # signing data is keccak256 hash of abi_encoded batch_call(args, message_id, turnstone_id, deadline)
     args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, TURNSTONE_ID, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
