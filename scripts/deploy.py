@@ -1,4 +1,4 @@
-from brownie import accounts, Turnstone
+from brownie import accounts, Compass
 from eth_abi import encode_abi
 
 def main():
@@ -6,5 +6,5 @@ def main():
     validators = [] # should update
     powers = [] # should update
     valset_id = 0 # should update
-    turnstone_id = b"ETH_01" # should update
-    Turnstone.deploy(encode_abi(["bytes32"], [turnstone_id]), [validators, powers, valset_id],{"from": acct})
+    compass_id = b"ETH_01" # should update
+    Compass.deploy(encode_abi(["bytes32"], [compass_id]), [validators, powers, valset_id],{"from": acct})

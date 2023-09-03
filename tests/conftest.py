@@ -1,14 +1,14 @@
 #!/usr/bin/python3
 
 import pytest
-from brownie import accounts, Turnstone, TestERC20, web3
+from brownie import accounts, Compass, TestERC20, web3
 from eth_abi import encode_abi
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
 @pytest.fixture
-def TurnstoneContract(validators, powers):
-    return Turnstone.deploy(bstring2bytes32(b"ETH_01"), [validators, powers, 0], {"from": accounts[0]})
+def CompassContract(validators, powers):
+    return Compass.deploy(bstring2bytes32(b"ETH_01"), [validators, powers, 0], {"from": accounts[0]})
 
 @pytest.fixture
 def TestERC20Contract():

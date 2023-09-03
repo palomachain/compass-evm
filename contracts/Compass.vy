@@ -1,6 +1,6 @@
 # @version 0.3.7
 """
-@title Turnstone-EVM
+@title Compass-EVM
 @author Volume.Finance
 """
 
@@ -9,7 +9,7 @@ MAX_PAYLOAD: constant(uint256) = 20480
 MAX_BATCH: constant(uint256) = 64
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
-TURNSTONE_ID: immutable(bytes32)
+COMPASS_ID: immutable(bytes32)
 
 interface ERC20:
     def balanceOf(_owner: address) -> uint256: view
@@ -66,11 +66,11 @@ last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 message_id_used: public(HashMap[uint256, bool])
 
-# turnstone_id: unique identifier for turnstone instance
+# compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(turnstone_id: bytes32, valset: Valset):
-    TURNSTONE_ID = turnstone_id
+def __init__(compass_id: bytes32, valset: Valset):
+    COMPASS_ID = compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
     # check cumulative power is enough
@@ -80,15 +80,15 @@ def __init__(turnstone_id: bytes32, valset: Valset):
             break
         i += 1
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
-    new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, turnstone_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
+    new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = valset.valset_id
     log ValsetUpdated(new_checkpoint, valset.valset_id)
 
 @external
 @pure
-def turnstone_id() -> bytes32:
-    return TURNSTONE_ID
+def compass_id() -> bytes32:
+    return COMPASS_ID
 
 # utility function to verify EIP712 signature
 @internal
@@ -116,13 +116,13 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
 # A checkpoint is a hash of all relevant information about the valset. This is stored by the contract,
 # instead of storing the information directly. This saves on storage and gas.
 # The format of the checkpoint is:
-# keccak256 hash of abi_encoded checkpoint(validators[], powers[], valset_id, turnstone_id)
+# keccak256 hash of abi_encoded checkpoint(validators[], powers[], valset_id, compass_id)
 # The validator powers must be decreasing or equal. This is important for checking the signatures on the
 # next valset, since it allows the caller to stop verifying signatures once a quorum of signatures have been verified.
 @internal
 @view
 def make_checkpoint(valset: Valset) -> bytes32:
-    return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, TURNSTONE_ID, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
+    return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, COMPASS_ID, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
 
 # This updates the valset by checking that the validators in the current valset have signed off on the
 # new valset. The signatures supplied are the signatures of the current valset over the checkpoint hash
@@ -163,8 +163,8 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uin
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, TURNSTONE_ID, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, COMPASS_ID, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -212,8 +212,8 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, turnstone_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, TURNSTONE_ID, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, COMPASS_ID, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
