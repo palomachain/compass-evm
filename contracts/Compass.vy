@@ -58,7 +58,6 @@ event SendToPalomaEvent:
 
 event BatchSendEvent:
     token: address
-    message_id: uint256
     batch_id: uint256
     event_id: uint256
 
@@ -192,17 +191,15 @@ def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     log SendToPalomaEvent(token, msg.sender, receiver, amount, event_id)
 
 @external
-def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, message_id: uint256, batch_id: uint256, deadline: uint256):
+def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256):
     assert block.timestamp <= deadline, "Timeout"
     assert self.last_batch_id[token] < batch_id, "Wrong batch id"
-    assert not self.message_id_used[message_id], "Used Message_ID"
     length: uint256 = len(args.receiver)
     assert length == len(args.amount), "Unmatched Params"
-    self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, compass_id, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, batch_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -213,7 +210,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, mess
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     self.last_batch_id[token] = batch_id
-    log BatchSendEvent(token, message_id, batch_id, event_id)
+    log BatchSendEvent(token, batch_id, event_id)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
