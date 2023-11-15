@@ -1,18 +1,20 @@
-# @version 0.3.7
+# @version 0.3.10
 """
 @title Compass-EVM
 @author Volume.Finance
 """
 
-MAX_VALIDATORS: constant(uint256) = 320
-MAX_PAYLOAD: constant(uint256) = 20480
+MAX_VALIDATORS: constant(uint256) = 175
+MAX_PAYLOAD: constant(uint256) = 10240
 MAX_BATCH: constant(uint256) = 64
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
-COMPASS_ID: immutable(bytes32)
+compass_id: public(immutable(bytes32))
 
 interface ERC20:
     def balanceOf(_owner: address) -> uint256: view
+    def transfer(_to: address, _value: uint256) -> bool: nonpayable
+    def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
 
 struct Valset:
     validators: DynArray[address, MAX_VALIDATORS] # Validator addresses
@@ -39,21 +41,25 @@ struct TokenSendArgs:
 event ValsetUpdated:
     checkpoint: bytes32
     valset_id: uint256
+    event_id: uint256
 
 event LogicCallEvent:
     logic_contract_address: address
     payload: Bytes[MAX_PAYLOAD]
     message_id: uint256
+    event_id: uint256
 
 event SendToPalomaEvent:
     token: address
     sender: address
     receiver: String[64]
     amount: uint256
+    event_id: uint256
 
 event BatchSendEvent:
     token: address
-    message_id: uint256
+    batch_id: uint256
+    event_id: uint256
 
 event ERC20DeployedEvent:
     paloma_denom: String[64]
@@ -61,16 +67,19 @@ event ERC20DeployedEvent:
     name: String[64]
     symbol: String[32]
     decimals: uint8
+    event_id: uint256
 
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
+last_event_id: public(uint256)
+last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
 
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(compass_id: bytes32, valset: Valset):
-    COMPASS_ID = compass_id
+def __init__(_compass_id: bytes32, _event_id: uint256, valset: Valset):
+    compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
     # check cumulative power is enough
@@ -83,12 +92,8 @@ def __init__(compass_id: bytes32, valset: Valset):
     new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = valset.valset_id
-    log ValsetUpdated(new_checkpoint, valset.valset_id)
-
-@external
-@pure
-def compass_id() -> bytes32:
-    return COMPASS_ID
+    self.last_event_id = _event_id
+    log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
 
 # utility function to verify EIP712 signature
 @internal
@@ -122,7 +127,7 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
 @internal
 @view
 def make_checkpoint(valset: Valset) -> bytes32:
-    return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, COMPASS_ID, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
+    return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
 
 # This updates the valset by checking that the validators in the current valset have signed off on the
 # new valset. The signatures supplied are the signatures of the current valset over the checkpoint hash
@@ -152,7 +157,9 @@ def update_valset(consensus: Consensus, new_valset: Valset):
     self.check_validator_signatures(consensus, new_checkpoint)
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = new_valset.valset_id
-    log ValsetUpdated(new_checkpoint, new_valset.valset_id)
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    log ValsetUpdated(new_checkpoint, new_valset.valset_id, event_id)
 
 # This makes calls to contracts that execute arbitrary logic
 # message_id is to prevent replay attack and every message_id can be used only once
@@ -164,67 +171,51 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uin
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, COMPASS_ID, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     raw_call(args.logic_contract_address, args.payload)
-    log LogicCallEvent(args.logic_contract_address, args.payload, message_id)
-
-@internal
-def _safe_transfer_from(_token: address, _from: address, _to: address, _value: uint256):
-    _response: Bytes[32] = raw_call(
-        _token,
-        _abi_encode(
-            _from, _to, _value,
-            method_id=method_id("transferFrom(address,address,uint256)")),
-        max_outsize=32
-    )  # dev: failed transferFrom
-    if len(_response) > 0:
-        assert convert(_response, bool), "TransferFrom failed"
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    log LogicCallEvent(args.logic_contract_address, args.payload, message_id, event_id)
 
 @external
 def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     _balance: uint256 = ERC20(token).balanceOf(self)
-    self._safe_transfer_from(token, msg.sender, self, amount)
+    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "TF fail"
     _balance = ERC20(token).balanceOf(self) - _balance
     assert _balance > 0, "Zero Transfer"
-    log SendToPalomaEvent(token, msg.sender, receiver, amount)
-
-@internal
-def _safe_transfer(_token: address, _to: address, _value: uint256):
-    _response: Bytes[32] = raw_call(
-        _token,
-        _abi_encode(
-            _to, _value,
-            method_id=method_id("transfer(address,uint256)")),
-        max_outsize=32
-    )  # dev: failed transferFrom
-    if len(_response) > 0:
-        assert convert(_response, bool), "TransferFrom failed"
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    log SendToPalomaEvent(token, msg.sender, receiver, amount, event_id)
 
 @external
-def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, message_id: uint256, deadline: uint256):
+def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256):
     assert block.timestamp <= deadline, "Timeout"
-    assert not self.message_id_used[message_id], "Used Message_ID"
+    assert self.last_batch_id[token] < batch_id, "Wrong batch id"
     length: uint256 = len(args.receiver)
     assert length == len(args.amount), "Unmatched Params"
-    self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, message_id, COMPASS_ID, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, batch_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     for i in range(MAX_BATCH):
         if  i >= length:
             break
-        self._safe_transfer(token, args.receiver[i], args.amount[i])
-    log BatchSendEvent(token, message_id)
+        assert ERC20(token).transfer(args.receiver[i], args.amount[i], default_return_value=True), "Tr fail"
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    self.last_batch_id[token] = batch_id
+    log BatchSendEvent(token, batch_id, event_id)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
     assert msg.sender == self, "Invalid"
     erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
-    log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals)
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals, event_id)
