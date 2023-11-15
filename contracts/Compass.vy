@@ -4,7 +4,7 @@
 @author Volume.Finance
 """
 
-MAX_VALIDATORS: constant(uint256) = 175
+MAX_VALIDATORS: constant(uint256) = 200
 MAX_PAYLOAD: constant(uint256) = 10240
 MAX_BATCH: constant(uint256) = 64
 
@@ -87,7 +87,7 @@ def __init__(_compass_id: bytes32, _event_id: uint256, valset: Valset):
         cumulative_power += valset.powers[i]
         if cumulative_power >= POWER_THRESHOLD:
             break
-        i += 1
+        i = unsafe_add(i, 1)
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
@@ -114,7 +114,7 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
             cumulative_power += consensus.valset.powers[i]
             if cumulative_power >= POWER_THRESHOLD:
                 break
-        i += 1
+        i = unsafe_add(i, 1)
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
 
 # Make a new checkpoint from the supplied validator set
@@ -147,7 +147,7 @@ def update_valset(consensus: Consensus, new_valset: Valset):
         cumulative_power += new_valset.powers[i]
         if cumulative_power >= POWER_THRESHOLD:
             break
-        i += 1
+        i = unsafe_add(i, 1)
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
