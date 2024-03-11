@@ -1,4 +1,6 @@
-# @version 0.3.10
+#pragma version 0.3.10
+#pragma optimize gas
+#pragma evm-version paris
 """
 @title Compass-EVM
 @author Volume.Finance
@@ -69,9 +71,33 @@ event ERC20DeployedEvent:
     decimals: uint8
     event_id: uint256
 
+event TreasuryUpdatedEvent:
+    feeset_id: uint256
+    community_fee: uint256
+    security_fee: uint256
+    event_id: uint256
+
+event FeesetUpdatedEvent:
+    feeset_id: uint256
+    relayer: address
+    value: uint256
+
+event Deposited:
+    paloma_address: bytes32
+    user: address
+    user_deposit_nonce: uint256
+    amount: uint256
+
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 last_event_id: public(uint256)
+feeset_id: public(uint256)
+relayer_feeset_id: public(HashMap[address, uint256])
+community_fee: public(uint256)
+security_fee: public(uint256)
+relayer_fee: public(HashMap[address, uint256])
+
+deposit_nonce: public(uint256)
 last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
 
@@ -164,14 +190,14 @@ def update_valset(consensus: Consensus, new_valset: Valset):
 # This makes calls to contracts that execute arbitrary logic
 # message_id is to prevent replay attack and every message_id can be used only once
 @external
-def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uint256, deadline: uint256):
+def submit_logic_call(consensus: Consensus, args: LogicCallArgs, paloma_address: bytes32, message_id: uint256, deadline: uint256):
     assert block.timestamp <= deadline, "Timeout"
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(args, paloma_address, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),bytes32,uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -219,3 +245,47 @@ def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[3
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals, event_id)
+
+@external
+def update_treasury(consensus: Consensus, _feeset_id: uint256, _community_fee: uint256, _security_fee: uint256):
+    assert self.feeset_id < _feeset_id, "Old feeset ID"
+    # check if the supplied current validator set matches the saved checkpoint
+    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(_feeset_id, _community_fee, _security_fee, method_id=method_id("update_treasury(uint256,uint256,uint256)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    self.feeset_id = _feeset_id
+    self.community_fee = _community_fee
+    self.security_fee = _security_fee
+    log TreasuryUpdatedEvent(_feeset_id, _community_fee, _security_fee, event_id)
+
+@external
+def update_feeset(_feeset_id: uint256, _value: uint256):
+    assert self.relayer_feeset_id[msg.sender] < _feeset_id, "Old feeset ID"
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    self.relayer_feeset_id[msg.sender] = _feeset_id
+    self.relayer_fee[msg.sender] = _value
+    log FeesetUpdatedEvent(_feeset_id, msg.sender, _value)
+
+@external
+@payable
+@nonreentrant('lock')
+def deposit(paloma_address: bytes32, amount: uint256):
+    if msg.value > amount:
+        send(msg.sender, unsafe_sub(msg.value, amount))
+    else:
+        assert msg.value == amount, "Insufficient deposit"
+    _nonce: uint256 = self.deposit_nonce
+    log Deposited(paloma_address, msg.sender, _nonce, msg.value)
+    self.deposit_nonce = unsafe_add(_nonce, 1)
+
+@external
+@nonreentrant('lock')
+def claim(relayer: address, amount: uint256):
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    send(relayer, amount)
+    self.last_event_id = event_id
