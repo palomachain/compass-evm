@@ -80,9 +80,8 @@ event TreasuryUpdatedEvent:
     event_id: uint256
 
 event Deposited:
-    paloma_address: bytes32
+    depositor_paloma_address: bytes32
     user: address
-    user_deposit_nonce: uint256
     amount: uint256
 
 DENOMINATOR: constant(uint256) = 10 ** 18
@@ -99,7 +98,6 @@ security_wallet: public(address)
 
 fee_balance: public(HashMap[bytes32, uint256])
 
-deposit_nonce: public(uint256)
 last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
 
@@ -193,23 +191,23 @@ def update_valset(consensus: Consensus, new_valset: Valset):
 # message_id is to prevent replay attack and every message_id can be used only once
 @external
 @nonreentrant('lock')
-def submit_logic_call(consensus: Consensus, args: LogicCallArgs, paloma_address: bytes32, gas_estimation: uint256, message_id: uint256, deadline: uint256):
+def submit_logic_call(consensus: Consensus, args: LogicCallArgs, author_paloma_address: bytes32, gas_estimation: uint256, message_id: uint256, deadline: uint256):
     assert block.timestamp <= deadline, "Timeout"
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
-    # signing data is keccak256 hash of abi_encoded logic_call(args, paloma_address, gas_estimation, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, paloma_address, gas_estimation, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),bytes32,uint256,uint256,bytes32,uint256)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, author_paloma_address, gas_estimation, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(args, author_paloma_address, gas_estimation, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),bytes32,uint256,uint256,bytes32,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     raw_call(args.logic_contract_address, args.payload)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
-    _fee_balance: uint256 = self.fee_balance[paloma_address]
+    _fee_balance: uint256 = self.fee_balance[author_paloma_address]
     gas_fee: uint256 = gas_estimation * tx.gasprice
     assert _fee_balance >= gas_fee, "Insufficient gas deposit"
-    self.fee_balance[paloma_address] = unsafe_sub(_fee_balance, gas_fee)
+    self.fee_balance[author_paloma_address] = unsafe_sub(_fee_balance, gas_fee)
     send(msg.sender, gas_fee)
     self.last_event_id = event_id
     log LogicCallEvent(args.logic_contract_address, args.payload, message_id, event_id)
@@ -275,7 +273,7 @@ def update_treasury(consensus: Consensus, _feeset_id: uint256, _community_fee: u
 @external
 @payable
 @nonreentrant('lock')
-def deposit(paloma_address: bytes32, amount: uint256):
+def deposit(depositor_paloma_address: bytes32, amount: uint256):
     if msg.value > amount:
         send(msg.sender, unsafe_sub(msg.value, amount))
     else:
@@ -286,7 +284,4 @@ def deposit(paloma_address: bytes32, amount: uint256):
     _fee = unsafe_div(amount * self.community_fee, DENOMINATOR)
     send(self.community_wallet, _fee)
     relayer_fee -= _fee
-    _nonce: uint256 = self.deposit_nonce
-    self.fee_balance[paloma_address] = unsafe_add(self.fee_balance[paloma_address], relayer_fee)
-    log Deposited(paloma_address, msg.sender, _nonce, relayer_fee)
-    self.deposit_nonce = unsafe_add(_nonce, 1)
+    self.fee_balance[depositor_paloma_address] = unsafe_add(self.fee_balance[depositor_paloma_address], relayer_fee)
