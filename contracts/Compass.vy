@@ -218,7 +218,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     _event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = _event_id
     self.last_batch_id[token] = batch_id
-    log BatchSendEvent(token, batch_id, _nonce, event_id)
+    log BatchSendEvent(token, batch_id, _nonce, _event_id)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
