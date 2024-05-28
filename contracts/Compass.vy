@@ -96,7 +96,7 @@ def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, v
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = valset.valset_id
     self.last_event_id = _event_id
-    self.last_gravity_nonce = _gravity_id
+    self.last_gravity_nonce = _gravity_nonce
     log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
 
 # utility function to verify EIP712 signature
