@@ -81,7 +81,7 @@ message_id_used: public(HashMap[uint256, bool])
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_id:uint256, valset: Valset):
+def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset):
     compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
