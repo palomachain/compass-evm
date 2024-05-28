@@ -54,11 +54,13 @@ event SendToPalomaEvent:
     sender: address
     receiver: String[64]
     amount: uint256
+    nonce: uint256
     event_id: uint256
 
 event BatchSendEvent:
     token: address
     batch_id: uint256
+    nonce: uint256
     event_id: uint256
 
 event ERC20DeployedEvent:
@@ -72,13 +74,14 @@ event ERC20DeployedEvent:
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 last_event_id: public(uint256)
+last_gravity_nonce: public(uint256)
 last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
 
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(_compass_id: bytes32, _event_id: uint256, valset: Valset):
+def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_id:uint256, valset: Valset):
     compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
@@ -93,6 +96,7 @@ def __init__(_compass_id: bytes32, _event_id: uint256, valset: Valset):
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = valset.valset_id
     self.last_event_id = _event_id
+    self.last_gravity_nonce = _gravity_id
     log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
 
 # utility function to verify EIP712 signature
@@ -186,9 +190,11 @@ def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "TF fail"
     _balance = ERC20(token).balanceOf(self) - _balance
     assert _balance > 0, "Zero Transfer"
-    event_id: uint256 = unsafe_add(self.last_event_id, 1)
-    self.last_event_id = event_id
-    log SendToPalomaEvent(token, msg.sender, receiver, amount, event_id)
+    _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
+    self.last_gravity_nonce = _nonce
+    _event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = _event_id
+    log SendToPalomaEvent(token, msg.sender, receiver, amount, _nonce, _event_id)
 
 @external
 def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256):
@@ -207,10 +213,12 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
         if  i >= length:
             break
         assert ERC20(token).transfer(args.receiver[i], args.amount[i], default_return_value=True), "Tr fail"
-    event_id: uint256 = unsafe_add(self.last_event_id, 1)
-    self.last_event_id = event_id
+    _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
+    self.last_gravity_nonce = _nonce
+    _event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = _event_id
     self.last_batch_id[token] = batch_id
-    log BatchSendEvent(token, batch_id, event_id)
+    log BatchSendEvent(token, batch_id, _nonce, event_id)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
