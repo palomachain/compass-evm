@@ -8,7 +8,7 @@ from eth_account.messages import encode_defunct
 
 @pytest.fixture
 def CompassContract(validators, powers):
-    return Compass.deploy(bstring2bytes32(b"ETH_01"), 0, [validators, powers, 0], {"from": accounts[0]})
+    return Compass.deploy(bstring2bytes32(b"ETH_01"), 0, 0, [validators, powers, 0], {"from": accounts[0]})
 
 @pytest.fixture
 def TestERC20Contract():
