@@ -1,4 +1,13 @@
-# @version 0.3.7
+#pragma version 0.3.10
+#pragma optimize gas
+#pragma evm-version shanghai
+
+"""
+@title PalomaERC20
+@license MIT
+@author Volume.Finance
+@notice v1.1.0
+"""
 
 event Transfer:
     _from: indexed(address)
@@ -79,7 +88,10 @@ def decreaseAllowance(_spender: address, _value: uint256) -> bool:
 
 @external
 def new_compass(_compass: address):
-    assert msg.sender == self.compass and _compass != msg.sender and len(msg.data) == 68 and convert(slice(msg.data, 36, 32), bytes32) == convert(0, bytes32), "Not available" # Attached data should be 0x
+    assert msg.sender == self.compass, "Sender is not old compass"
+    assert _compass != msg.sender, "New address should not be same as the old compass"
+    assert len(msg.data) == 68, "Message length is wrong"
+    assert convert(slice(msg.data, 36, 32), bytes32) == convert(0, bytes32), "Attached Paloma address should be bytes32(0)" # Attached data should be 0x
     self.compass = _compass
     self.balanceOf[_compass] = unsafe_add(self.balanceOf[_compass], self.balanceOf[msg.sender])
     self.balanceOf[msg.sender] = 0
