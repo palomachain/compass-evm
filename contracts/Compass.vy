@@ -1,7 +1,10 @@
 # @version 0.3.10
+
 """
-@title Compass-EVM
+@title Compass
+@license MIT
 @author Volume.Finance
+@notice v1.1.0
 """
 
 MAX_VALIDATORS: constant(uint256) = 200
