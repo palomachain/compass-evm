@@ -6,7 +6,7 @@
 @title Compass
 @license MIT
 @author Volume.Finance
-@notice v1.1.0
+@notice v2.0.0
 """
 
 MAX_VALIDATORS: constant(uint256) = 200
@@ -20,6 +20,18 @@ interface ERC20:
     def balanceOf(_owner: address) -> uint256: view
     def transfer(_to: address, _value: uint256) -> bool: nonpayable
     def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
+
+interface FeeManager:
+    def deposit(depositor_paloma_address: bytes32): payable
+    def withdraw(receiver: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256): nonpayable
+    def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address): nonpayable
+    def security_fee_topup(): payable
+    def reserve_security_fee(sender: address, gas_fee: uint256): nonpayable
+    def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> (address, uint256): nonpayable
+    def update_compass(_new_compass: address): nonpayable
+
+interface Compass:
+    def FEE_MANAGER() -> address: view
 
 struct Valset:
     validators: DynArray[address, MAX_VALIDATORS] # Validator addresses
@@ -43,6 +55,11 @@ struct TokenSendArgs:
     receiver: DynArray[address, MAX_BATCH]
     amount: DynArray[uint256, MAX_BATCH]
 
+struct FeeArgs:
+    community_fee: uint256 # Total amount to alot for community wallet
+    security_fee: uint256 # Total amount to alot for security wallet
+    fee_payer_paloma_address: bytes32 # Paloma address covering the fees
+
 event ValsetUpdated:
     checkpoint: bytes32
     valset_id: uint256
@@ -57,7 +74,7 @@ event LogicCallEvent:
 event SendToPalomaEvent:
     token: address
     sender: address
-    receiver: String[64]
+    receiver: bytes32
     amount: uint256
     nonce: uint256
     event_id: uint256
@@ -76,17 +93,31 @@ event ERC20DeployedEvent:
     decimals: uint8
     event_id: uint256
 
+event FundsDepositedEvent:
+    depositor_paloma_address: bytes32
+    sender: address
+    amount: uint256
+
+event FundsWithdrawnEvent:
+    receiver: address
+    amount: uint256
+
+event UpdateCompassAddressInFeeManager:
+    new_compass: address
+    event_id: uint256
+
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 last_event_id: public(uint256)
 last_gravity_nonce: public(uint256)
 last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
+FEE_MANAGER: public(immutable(address))
 
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset):
+def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset, fee_manager: address):
     compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
@@ -96,13 +127,20 @@ def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, v
         if cumulative_power >= POWER_THRESHOLD:
             break
         i = unsafe_add(i, 1)
-    assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
+    self.power_check(cumulative_power)
     new_checkpoint: bytes32 = keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = valset.valset_id
     self.last_event_id = _event_id
     self.last_gravity_nonce = _gravity_nonce
+    FEE_MANAGER = fee_manager
     log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
+
+
+@internal
+def power_check(cumulative_power: uint256):
+    assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
+
 
 # utility function to verify EIP712 signature
 @internal
@@ -124,7 +162,7 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
             if cumulative_power >= POWER_THRESHOLD:
                 break
         i = unsafe_add(i, 1)
-    assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
+    self.power_check(cumulative_power)
 
 # Make a new checkpoint from the supplied validator set
 # A checkpoint is a hash of all relevant information about the valset. This is stored by the contract,
@@ -138,6 +176,23 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
 def make_checkpoint(valset: Valset) -> bytes32:
     return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
 
+@internal
+def gas_check(gas_estimate: uint256):
+    assert msg.gas >= gas_estimate, "Insufficient funds to cover gas estimate"
+
+@internal
+def deadline_check(deadline: uint256):
+    assert block.timestamp <= deadline, "Timeout"
+
+@internal
+def reserve_security_fee(gas_estimate: uint256):
+    self.gas_check(gas_estimate)
+    FeeManager(FEE_MANAGER).reserve_security_fee(msg.sender, unsafe_mul(tx.gasprice, gas_estimate))
+
+@internal
+def check_checkpoint(checkpoint: bytes32):
+    assert self.last_checkpoint == checkpoint, "Incorrect Checkpoint"
+
 # This updates the valset by checking that the validators in the current valset have signed off on the
 # new valset. The signatures supplied are the signatures of the current valset over the checkpoint hash
 # generated from the new valset.
@@ -146,7 +201,8 @@ def make_checkpoint(valset: Valset) -> bytes32:
 # valset: new validator set to update with
 # consensus: current validator set and signatures
 @external
-def update_valset(consensus: Consensus, new_valset: Valset):
+def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint256):
+    self.reserve_security_fee(gas_estimate)
     # check if new valset_id is greater than current valset_id
     assert new_valset.valset_id > consensus.valset.valset_id, "Invalid Valset ID"
     cumulative_power: uint256 = 0
@@ -157,13 +213,14 @@ def update_valset(consensus: Consensus, new_valset: Valset):
         if cumulative_power >= POWER_THRESHOLD:
             break
         i = unsafe_add(i, 1)
-    assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
+    self.power_check(cumulative_power)
     # check if the supplied current validator set matches the saved checkpoint
-    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # calculate the new checkpoint
     new_checkpoint: bytes32 = self.make_checkpoint(new_valset)
+    args_hash: bytes32 = keccak256(_abi_encode(new_checkpoint, gas_estimate, method_id=method_id("update_valset(bytes32,uint256)")))
     # check if enough validators signed new validator set (new checkpoint)
-    self.check_validator_signatures(consensus, new_checkpoint)
+    self.check_validator_signatures(consensus, args_hash)
     self.last_checkpoint = new_checkpoint
     self.last_valset_id = new_valset.valset_id
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
@@ -173,28 +230,26 @@ def update_valset(consensus: Consensus, new_valset: Valset):
 # This makes calls to contracts that execute arbitrary logic
 # message_id is to prevent replay attack and every message_id can be used only once
 @external
-def submit_logic_call(consensus: Consensus, args: LogicCallArgs, message_id: uint256, deadline: uint256):
-    assert block.timestamp <= deadline, "Timeout"
+def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256, gas_estimate: uint256):
+    self.gas_check(gas_estimate)
+    self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
-    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, message_id, compass_id, deadline, method_id=method_id("logic_call((address,bytes),uint256,bytes32,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(args, fee_args, message_id, compass_id, deadline, msg.sender, gas_estimate, method_id=method_id("logic_call((address,bytes),(uint256,uint256,bytes32),uint256,bytes32,uint256,address,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     raw_call(args.logic_contract_address, args.payload)
+    FeeManager(FEE_MANAGER).transfer_fees(fee_args, unsafe_mul(tx.gasprice, gas_estimate), msg.sender)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log LogicCallEvent(args.logic_contract_address, args.payload, message_id, event_id)
 
-@external
-def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
-    _balance: uint256 = ERC20(token).balanceOf(self)
-    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "TF fail"
-    _balance = ERC20(token).balanceOf(self) - _balance
-    assert _balance > 0, "Zero Transfer"
+@internal
+def _send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
     _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
     self.last_gravity_nonce = _nonce
     _event_id: uint256 = unsafe_add(self.last_event_id, 1)
@@ -202,15 +257,23 @@ def send_token_to_paloma(token: address, receiver: String[64], amount: uint256):
     log SendToPalomaEvent(token, msg.sender, receiver, amount, _nonce, _event_id)
 
 @external
-def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256):
-    assert block.timestamp <= deadline, "Timeout"
+def send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
+    _balance: uint256 = ERC20(token).balanceOf(self)
+    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "TF fail"
+    _balance = ERC20(token).balanceOf(self) - _balance
+    self._send_token_to_paloma(token, receiver, _balance)
+
+@external
+def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256, gas_estimate: uint256):
+    self.reserve_security_fee(gas_estimate)
+    self.deadline_check(deadline)
     assert self.last_batch_id[token] < batch_id, "Wrong batch id"
     length: uint256 = len(args.receiver)
     assert length == len(args.amount), "Unmatched Params"
     # check if the supplied current validator set matches the saved checkpoint
-    assert self.last_checkpoint == self.make_checkpoint(consensus.valset), "Incorrect Checkpoint"
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded batch_call(args, batch_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, gas_estimate, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -232,3 +295,96 @@ def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[3
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals, event_id)
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# F E E S
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+# Deposit some balance on the contract to be used when sending messages from Paloma.
+# depositor_paloma_address: paloma address to which to attribute the sent amount
+# amount: amount of COIN to register with compass. Overpaid balance will be sent back.
+@external
+@payable
+@nonreentrant('lock')
+def deposit(depositor_paloma_address: bytes32, amount: uint256):
+    if amount > msg.value:
+        send(msg.sender, unsafe_sub(amount, msg.value))
+    else:
+        assert amount == msg.value, "Insufficient deposit"
+    FeeManager(FEE_MANAGER).deposit(depositor_paloma_address, value=amount)
+    log FundsDepositedEvent(depositor_paloma_address, msg.sender, amount)
+
+# Withdraw ramped up claimable rewards from compass. Withdrawals will be swapped and
+# reimbursed in GRAIN.
+# amount: the amount of COIN to withdraw.
+# exchange: address of the DEX to use for exchanging the token
+@external
+def withdraw(amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
+    FeeManager(FEE_MANAGER).withdraw(msg.sender, amount, dex, payload, min_grain)
+    log FundsWithdrawnEvent(msg.sender, amount)
+
+# Top up the security funds on the contract used to reimburse all infrastructure
+# related messages. All sent value will be consumed.
+@external
+@payable
+@nonreentrant('lock')
+def security_fee_topup(amount: uint256):
+    if amount > msg.value:
+        send(msg.sender, unsafe_sub(amount, msg.value))
+    else:
+        assert amount == msg.value, "Insufficient deposit"
+    # Make sure we check against overflow here
+    FeeManager(FEE_MANAGER).security_fee_topup(value=msg.value)
+
+# Bridge the current balance of the community funds back to Paloma
+# consensus: current validator set and signatures
+# message_id: incremental unused message ID
+# deadline: message deadline
+# exchange: address of the DEX to use for exchanging the token
+# receiver: Paloma address to receive the funds
+# authority: intended message sender address
+# gas_estimate: gas estimation in wei
+@external
+@nonreentrant('lock')
+def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, deadline: uint256, receiver: bytes32, gas_estimate: uint256, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
+    self.reserve_security_fee(gas_estimate)
+    self.deadline_check(deadline)
+    assert not self.message_id_used[message_id], "Used Message_ID"
+    self.message_id_used[message_id] = True
+
+    # check if the supplied current validator set matches the saved checkpoint
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
+
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(message_id, deadline, receiver, msg.sender, gas_estimate, amount, dex, payload,  min_grain, method_id=method_id("bridge_community_tax_to_paloma(uint256,uint256,byte32,address,uint256,uint256,address,bytes,uint256)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+
+    # TODO: Implement: (Steven)
+    # - exchange `self.rewards_community_wallet` amount for GRAINS on DEX
+    # - call `send_token_to_paloma`, send exchanged GRAINS to receiver address
+
+    grain: address = empty(address)
+    grain_balance: uint256 = 0
+    grain, grain_balance = FeeManager(FEE_MANAGER).bridge_community_fee_to_paloma(amount, dex, payload, min_grain)
+    self._send_token_to_paloma(grain, receiver, grain_balance)
+
+# This function is to update compass address in fee manager contract. After running this function, This Compass-evm can't be used anymore.
+@external
+def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint256, gas_estimate: uint256, _new_compass: address):
+    self.reserve_security_fee(gas_estimate)
+    self.deadline_check(deadline)
+    # check if the supplied current validator set matches the saved checkpoint
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
+    args_hash: bytes32 = keccak256(_abi_encode(deadline, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,uint256,address)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+    # check if the new compass address is correct
+    assert Compass(_new_compass).FEE_MANAGER() == FEE_MANAGER, "Wrong new compass address"
+    # make call to logic contract
+    FeeManager(FEE_MANAGER).update_compass(_new_compass)
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    log UpdateCompassAddressInFeeManager(_new_compass, event_id)
