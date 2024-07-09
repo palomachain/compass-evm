@@ -218,7 +218,7 @@ def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint25
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # calculate the new checkpoint
     new_checkpoint: bytes32 = self.make_checkpoint(new_valset)
-    args_hash: bytes32 = keccak256(_abi_encode(new_checkpoint, gas_estimate, method_id=method_id("update_valset(bytes32,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(new_checkpoint, msg.sender, gas_estimate, method_id=method_id("update_valset(bytes32,address,uint256)")))
     # check if enough validators signed new validator set (new checkpoint)
     self.check_validator_signatures(consensus, args_hash)
     self.last_checkpoint = new_checkpoint
@@ -273,7 +273,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded batch_call(args, batch_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, gas_estimate, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, msg.sender, gas_estimate, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256,address,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -378,7 +378,7 @@ def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint25
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(deadline, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,uint256,address)")))
+    args_hash: bytes32 = keccak256(_abi_encode(deadline, msg.sender, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,address,uint256,address)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # check if the new compass address is correct
