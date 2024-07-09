@@ -18,8 +18,8 @@ struct FeeArgs:
     security_fee: uint256 # Total amount to alot for security wallet
     fee_payer_paloma_address: bytes32 # Paloma address covering the fees
 
-compass: public(address)
-grain: public(address)
+compass: public(address) # compass-evm address
+grain: public(address) # grain token address
 
 # Rewards program
 rewards_community_balance: public(uint256) # stores the balance attributed to the community wallet
@@ -43,7 +43,6 @@ def compass_check():
 def deposit(depositor_paloma_address: bytes32):
     # Deposit some balance on the contract to be used when sending messages from Paloma.
     # depositor_paloma_address: paloma address to which to attribute the sent amount
-    # amount: amount of COIN to register with compass. Overpaid balance will be sent back.
     self.compass_check()
     self.funds[depositor_paloma_address] = unsafe_add(self.funds[depositor_paloma_address], msg.value)
     self.total_funds = unsafe_add(self.total_funds, msg.value)
@@ -59,19 +58,22 @@ def swap_grain(_grain: address, amount:uint256, dex: address, payload: Bytes[102
 
 @external
 @nonreentrant('lock')
-def withdraw(sender: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
+def withdraw(receiver: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
     # Withdraw ramped up claimable rewards from compass. Withdrawals will be swapped and
     # reimbursed in GRAIN.
+    # receiver: the validator address to receive grain token
     # amount: the amount of COIN to withdraw.
-    # exchange: address of the DEX to use for exchanging the token
+    # dex: address of the DEX to use for exchanging the token
+    # payload: the function payload to exchange ETH to grain for the dex
+    # min_grain: expected grain amount getting from dex to prevent front-running(high slippage / sandwich attack)
     self.compass_check()
     assert convert(slice(msg.data, unsafe_sub(len(msg.data), 32), 32), uint256) == min_grain, "SLC is unavailable"
-    self.claimable_rewards[sender] = unsafe_sub(self.claimable_rewards[sender], amount)
+    self.claimable_rewards[receiver] = unsafe_sub(self.claimable_rewards[receiver], amount)
     self.total_claims = self.total_claims - amount
-    assert self.claimable_rewards[sender] >= amount, "Missing claimable rewards"
+    assert self.claimable_rewards[receiver] >= amount, "Missing claimable rewards"
     _grain: address = self.grain
     grain_balance: uint256 = self.swap_grain(_grain, amount, dex, payload, min_grain)
-    ERC20(_grain).transfer(sender, grain_balance)
+    ERC20(_grain).transfer(receiver, grain_balance)
 
 @external
 @payable
@@ -84,6 +86,8 @@ def security_fee_topup():
 def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address):
     # Transfer fees to the community and security wallets.
     # fee_args: the FeeArgs struct containing the fee amounts.
+    # relayer_fee: fee to message relayer
+    # relayer: relayer address
     self.compass_check()
     assert convert(slice(msg.data, unsafe_sub(len(msg.data), 32), 32), address) == relayer, "SLC is unavailable"
     self.rewards_community_balance = unsafe_add(self.rewards_community_balance, fee_args.community_fee)
@@ -98,6 +102,9 @@ def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address):
 
 @external
 def reserve_security_fee(sender: address, gas_fee: uint256):
+    # increase funds for relayer who ran other functions than SLC
+    # sender: transaction sender address
+    # gas_fee: gas fee in wei
     self.compass_check()
     assert convert(slice(msg.data, unsafe_sub(len(msg.data), 32), 32), uint256) == gas_fee, "SLC is unavailable"
     _rewards_security_balance: uint256 = self.rewards_security_balance
@@ -108,6 +115,11 @@ def reserve_security_fee(sender: address, gas_fee: uint256):
 
 @external
 def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> uint256:
+    # bridge community fee t0 paloma address
+    # amount: community fee ETH amount
+    # dex: address of the DEX to use for exchanging the token
+    # payload: the function payload to exchange ETH to grain for the dex
+    # min_grain: expected grain amount getting from dex to prevent front-running(high slippage / sandwich attack)
     _grain: address = self.grain
     _rewards_community_balance: uint256 = self.rewards_community_balance
     assert _rewards_community_balance >= amount, "Insufficient community fee"
@@ -118,6 +130,8 @@ def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes
 
 @external
 def update_compass(_new_compass: address):
+    # update compass address
+    # _new_compass: new compass address
     self.compass_check()
     assert convert(slice(msg.data, unsafe_sub(len(msg.data), 32), 32), address) == _new_compass, "SLC is unavailable"
     self.compass = _new_compass

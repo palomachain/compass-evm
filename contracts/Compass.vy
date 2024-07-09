@@ -136,7 +136,7 @@ def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, v
     FEE_MANAGER = fee_manager
     log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
 
-
+# check if cumulated power is enough
 @internal
 def power_check(cumulative_power: uint256):
     assert cumulative_power >= POWER_THRESHOLD, "Insufficient Power"
@@ -176,6 +176,7 @@ def check_validator_signatures(consensus: Consensus, hash: bytes32):
 def make_checkpoint(valset: Valset) -> bytes32:
     return keccak256(_abi_encode(valset.validators, valset.powers, valset.valset_id, compass_id, method_id=method_id("checkpoint(address[],uint256[],uint256,bytes32)")))
 
+# check if the gas estimate is too big
 @internal
 def gas_check(gas_estimate: uint256):
     assert msg.gas >= gas_estimate, "Insufficient funds to cover gas estimate"
@@ -259,7 +260,7 @@ def _send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
 @external
 def send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
     _balance: uint256 = ERC20(token).balanceOf(self)
-    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "TF fail"
+    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "failed TransferFrom"
     _balance = ERC20(token).balanceOf(self) - _balance
     self._send_token_to_paloma(token, receiver, _balance)
 
@@ -318,7 +319,9 @@ def deposit(depositor_paloma_address: bytes32, amount: uint256):
 # Withdraw ramped up claimable rewards from compass. Withdrawals will be swapped and
 # reimbursed in GRAIN.
 # amount: the amount of COIN to withdraw.
-# exchange: address of the DEX to use for exchanging the token
+# dex: address of the DEX to use for exchanging the token
+# payload: the function payload to exchange ETH to grain for the dex
+# min_grain: expected grain amount getting from dex to prevent front-running(high slippage / sandwich attack)
 @external
 def withdraw(amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
     FeeManager(FEE_MANAGER).withdraw(msg.sender, amount, dex, payload, min_grain)
@@ -341,10 +344,12 @@ def security_fee_topup(amount: uint256):
 # consensus: current validator set and signatures
 # message_id: incremental unused message ID
 # deadline: message deadline
-# exchange: address of the DEX to use for exchanging the token
 # receiver: Paloma address to receive the funds
-# authority: intended message sender address
-# gas_estimate: gas estimation in wei
+# gas_estimate: gas amount estimation
+# amount: Ete amount to swap and bridge
+# dex: address of the DEX to use for exchanging the Eth
+# payload: the function payload to exchange ETH to grain for the dex
+# min_grain: expected grain amount getting from dex to prevent front-running(high slippage / sandwich attack)
 @external
 @nonreentrant('lock')
 def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, deadline: uint256, receiver: bytes32, gas_estimate: uint256, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
@@ -371,6 +376,10 @@ def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, de
     self._send_token_to_paloma(grain, receiver, grain_balance)
 
 # This function is to update compass address in fee manager contract. After running this function, This Compass-evm can't be used anymore.
+# consensus: current validator set and signatures
+# deadline: message deadline
+# gas_estimate: gas amount estimation
+# _new_compass: new compass address
 @external
 def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint256, gas_estimate: uint256, _new_compass: address):
     self.reserve_security_fee(gas_estimate)
