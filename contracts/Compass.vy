@@ -330,12 +330,12 @@ def withdraw(amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint
 @payable
 @nonreentrant('lock')
 def security_fee_topup(amount: uint256):
-    if amount > msg.value:
-        send(msg.sender, unsafe_sub(amount, msg.value))
+    if msg.value > amount:
+        send(msg.sender, unsafe_sub(msg.value, amount))
     else:
         assert amount == msg.value, "Insufficient deposit"
     # Make sure we check against overflow here
-    FeeManager(FEE_MANAGER).security_fee_topup(value=msg.value)
+    FeeManager(FEE_MANAGER).security_fee_topup(value=amount)
 
 # Bridge the current balance of the community funds back to Paloma
 # consensus: current validator set and signatures
