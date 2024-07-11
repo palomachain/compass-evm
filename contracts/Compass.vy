@@ -112,6 +112,7 @@ last_event_id: public(uint256)
 last_gravity_nonce: public(uint256)
 last_batch_id: public(HashMap[address, uint256])
 message_id_used: public(HashMap[uint256, bool])
+slc_switch: public(bool)
 FEE_MANAGER: public(immutable(address))
 
 # compass_id: unique identifier for compass instance
@@ -243,7 +244,9 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeAr
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
+    self.slc_switch = True
     raw_call(args.logic_contract_address, args.payload)
+    self.slc_switch = False
     FeeManager(FEE_MANAGER).transfer_fees(fee_args, unsafe_mul(tx.gasprice, gas_estimate), msg.sender)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
@@ -281,7 +284,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     for i in range(MAX_BATCH):
         if  i >= length:
             break
-        assert ERC20(token).transfer(args.receiver[i], args.amount[i], default_return_value=True), "Tr fail"
+        assert ERC20(token).transfer(args.receiver[i], args.amount[i], default_return_value=True), "failed transfer"
     _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
     self.last_gravity_nonce = _nonce
     _event_id: uint256 = unsafe_add(self.last_event_id, 1)
