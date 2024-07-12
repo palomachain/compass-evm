@@ -234,6 +234,7 @@ def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint25
 @external
 def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256, gas_estimate: uint256):
     self.gas_check(gas_estimate)
+    FeeManager(FEE_MANAGER).transfer_fees(fee_args, unsafe_mul(tx.gasprice, gas_estimate), msg.sender)
     self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
@@ -247,7 +248,6 @@ def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeAr
     self.slc_switch = True
     raw_call(args.logic_contract_address, args.payload)
     self.slc_switch = False
-    FeeManager(FEE_MANAGER).transfer_fees(fee_args, unsafe_mul(tx.gasprice, gas_estimate), msg.sender)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log LogicCallEvent(args.logic_contract_address, args.payload, message_id, event_id)
