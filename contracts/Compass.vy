@@ -369,10 +369,6 @@ def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, de
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
 
-    # TODO: Implement: (Steven)
-    # - exchange `self.rewards_community_wallet` amount for GRAINS on DEX
-    # - call `send_token_to_paloma`, send exchanged GRAINS to receiver address
-
     grain: address = empty(address)
     grain_balance: uint256 = 0
     grain, grain_balance = FeeManager(FEE_MANAGER).bridge_community_fee_to_paloma(amount, dex, payload, min_grain)
