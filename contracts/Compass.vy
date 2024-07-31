@@ -11,6 +11,7 @@
 
 MAX_VALIDATORS: constant(uint256) = 200
 MAX_PAYLOAD: constant(uint256) = 10240
+MAX_EVENT: constant(uint256) = 1024
 MAX_BATCH: constant(uint256) = 64
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
@@ -74,6 +75,12 @@ event ERC20DeployedEvent:
     name: String[64]
     symbol: String[32]
     decimals: uint8
+    event_id: uint256
+
+event ArbitraryEvent:
+    contract_address: address
+    event_data: Bytes[1024]
+    nonce: uint256
     event_id: uint256
 
 last_checkpoint: public(bytes32)
@@ -224,6 +231,14 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     self.last_event_id = _event_id
     self.last_batch_id[token] = batch_id
     log BatchSendEvent(token, batch_id, _nonce, _event_id)
+
+@external
+def emit_arbitrary_event(event_data: Bytes[1024]):
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    self.last_event_id = event_id
+    _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
+    self.last_gravity_nonce = _nonce
+    log ArbitraryEvent(msg.sender, event_data, _nonce, event_id)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
