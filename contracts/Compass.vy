@@ -24,7 +24,7 @@ interface ERC20:
 interface FeeManager:
     def deposit(depositor_paloma_address: bytes32): payable
     def withdraw(receiver: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256): nonpayable
-    def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address): nonpayable
+    def transfer_fees(fee_args: FeeArgs, relayer: address): nonpayable
     def security_fee_topup(): payable
     def reserve_security_fee(sender: address, gas_fee: uint256): nonpayable
     def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> (address, uint256): nonpayable
@@ -56,6 +56,7 @@ struct TokenSendArgs:
     amount: DynArray[uint256, MAX_BATCH]
 
 struct FeeArgs:
+    relayer_fee: uint256 # Total amount to alot for relayer
     community_fee: uint256 # Total amount to alot for community wallet
     security_fee: uint256 # Total amount to alot for security wallet
     fee_payer_paloma_address: bytes32 # Paloma address covering the fees
@@ -232,16 +233,15 @@ def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint25
 # This makes calls to contracts that execute arbitrary logic
 # message_id is to prevent replay attack and every message_id can be used only once
 @external
-def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256, gas_estimate: uint256):
-    self.gas_check(gas_estimate)
-    FeeManager(FEE_MANAGER).transfer_fees(fee_args, unsafe_mul(tx.gasprice, gas_estimate), msg.sender)
+def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256):
+    FeeManager(FEE_MANAGER).transfer_fees(fee_args, msg.sender)
     self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, fee_args, message_id, compass_id, deadline, msg.sender, gas_estimate, method_id=method_id("logic_call((address,bytes),(uint256,uint256,bytes32),uint256,bytes32,uint256,address,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(args, fee_args, message_id, compass_id, deadline, msg.sender, method_id=method_id("logic_call((address,bytes),(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract

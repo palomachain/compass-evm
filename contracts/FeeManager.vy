@@ -17,6 +17,7 @@ interface Compass:
     def slc_switch() -> bool: view
 
 struct FeeArgs:
+    relayer_fee: uint256 # Total amount to alot for relayer
     community_fee: uint256 # Total amount to alot for community wallet
     security_fee: uint256 # Total amount to alot for security wallet
     fee_payer_paloma_address: bytes32 # Paloma address covering the fees
@@ -88,7 +89,7 @@ def security_fee_topup():
     self.rewards_security_balance = unsafe_add(self.rewards_security_balance, msg.value)
 
 @external
-def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address):
+def transfer_fees(fee_args: FeeArgs, relayer: address):
     # Transfer fees to the community and security wallets.
     # fee_args: the FeeArgs struct containing the fee amounts.
     # relayer_fee: fee to message relayer
@@ -97,12 +98,12 @@ def transfer_fees(fee_args: FeeArgs, relayer_fee: uint256, relayer: address):
     self.compass_check(_compass)
     self.rewards_community_balance = unsafe_add(self.rewards_community_balance, fee_args.community_fee)
     self.rewards_security_balance = unsafe_add(self.rewards_security_balance, fee_args.security_fee)
-    self.claimable_rewards[relayer] = unsafe_add(self.claimable_rewards[relayer], relayer_fee)
-    total_fee: uint256 = relayer_fee + fee_args.community_fee + fee_args.security_fee
+    self.claimable_rewards[relayer] = unsafe_add(self.claimable_rewards[relayer], fee_args.relayer_fee)
+    total_fee: uint256 = fee_args.relayer_fee + fee_args.community_fee + fee_args.security_fee
     user_remaining_funds: uint256 = self.funds[fee_args.fee_payer_paloma_address]
     assert user_remaining_funds >= total_fee, "Insufficient funds"
     self.funds[fee_args.fee_payer_paloma_address] = unsafe_sub(user_remaining_funds, total_fee)
-    self.total_claims = unsafe_add(self.total_claims, relayer_fee)
+    self.total_claims = unsafe_add(self.total_claims, fee_args.relayer_fee)
     self.total_funds = unsafe_sub(self.total_funds, total_fee)
 
 @external
