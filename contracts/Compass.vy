@@ -77,11 +77,12 @@ event ERC20DeployedEvent:
     decimals: uint8
     event_id: uint256
 
-event ArbitraryEvent:
+event NodeSold:
     contract_address: address
-    event_data: Bytes[1024]
-    nonce: uint256
-    event_id: uint256
+    buyer: address
+    paloma: bytes32
+    node_count: uint256
+    grain_amount: uint256
 
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
@@ -233,12 +234,12 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     log BatchSendEvent(token, batch_id, _nonce, _event_id)
 
 @external
-def emit_arbitrary_event(event_data: Bytes[1024]):
+def emit_arbitrary_event(buyer: address, paloma: bytes32, node_count: uint256, grain_amount: uint256):
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
     self.last_gravity_nonce = _nonce
-    log ArbitraryEvent(msg.sender, event_data, _nonce, event_id)
+    log NodeSold(msg.sender, buyer, paloma, node_count, grain_amount)
 
 @external
 def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
