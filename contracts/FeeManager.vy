@@ -94,23 +94,27 @@ def transfer_fees(fee_args: FeeArgs, relayer: address):
     # fee_args: the FeeArgs struct containing the fee amounts.
     # relayer_fee: fee to message relayer
     # relayer: relayer address
+    _community_fee: uint256 = fee_args.community_fee * tx.gasprice
+    _security_fee: uint256 = fee_args.security_fee * tx.gasprice
+    _relayer_fee: uint256 = fee_args.relayer_fee * tx.gasprice
+    _total_fee: uint256 = _community_fee + _security_fee + _relayer_fee
     _compass: address = self.compass
     self.compass_check(_compass)
-    self.rewards_community_balance = unsafe_add(self.rewards_community_balance, fee_args.community_fee)
-    self.rewards_security_balance = unsafe_add(self.rewards_security_balance, fee_args.security_fee)
-    self.claimable_rewards[relayer] = unsafe_add(self.claimable_rewards[relayer], fee_args.relayer_fee)
-    total_fee: uint256 = fee_args.relayer_fee + fee_args.community_fee + fee_args.security_fee
+    self.rewards_community_balance = unsafe_add(self.rewards_community_balance, _community_fee)
+    self.rewards_security_balance = unsafe_add(self.rewards_security_balance, _security_fee)
+    self.claimable_rewards[relayer] = unsafe_add(self.claimable_rewards[relayer], _relayer_fee)
     user_remaining_funds: uint256 = self.funds[fee_args.fee_payer_paloma_address]
-    assert user_remaining_funds >= total_fee, "Insufficient funds"
-    self.funds[fee_args.fee_payer_paloma_address] = unsafe_sub(user_remaining_funds, total_fee)
-    self.total_claims = unsafe_add(self.total_claims, fee_args.relayer_fee)
-    self.total_funds = unsafe_sub(self.total_funds, total_fee)
+    assert user_remaining_funds >= _total_fee, "Insufficient funds"
+    self.funds[fee_args.fee_payer_paloma_address] = unsafe_sub(user_remaining_funds, _total_fee)
+    self.total_claims = unsafe_add(self.total_claims, _relayer_fee)
+    self.total_funds = unsafe_sub(self.total_funds, _total_fee)
 
 @external
-def reserve_security_fee(sender: address, gas_fee: uint256):
+def reserve_security_fee(sender: address, gas_fee_amount: uint256):
     # increase funds for relayer who ran other functions than SLC
     # sender: transaction sender address
     # gas_fee: gas fee in wei
+    gas_fee: uint256 = gas_fee_amount * tx.gasprice
     _compass: address = self.compass
     self.compass_check(_compass)
     _rewards_security_balance: uint256 = self.rewards_security_balance

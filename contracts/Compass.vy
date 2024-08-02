@@ -26,7 +26,7 @@ interface FeeManager:
     def withdraw(receiver: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256): nonpayable
     def transfer_fees(fee_args: FeeArgs, relayer: address): nonpayable
     def security_fee_topup(): payable
-    def reserve_security_fee(sender: address, gas_fee: uint256): nonpayable
+    def reserve_security_fee(sender: address, gas_fee_amount: uint256): nonpayable
     def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> (address, uint256): nonpayable
     def update_compass(_new_compass: address): nonpayable
 
@@ -190,7 +190,7 @@ def deadline_check(deadline: uint256):
 @internal
 def reserve_security_fee(gas_estimate: uint256):
     self.gas_check(gas_estimate)
-    FeeManager(FEE_MANAGER).reserve_security_fee(msg.sender, unsafe_mul(tx.gasprice, gas_estimate))
+    FeeManager(FEE_MANAGER).reserve_security_fee(msg.sender, gas_estimate)
 
 @internal
 def check_checkpoint(checkpoint: bytes32):
@@ -299,6 +299,11 @@ def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[3
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals, event_id)
+
+@external
+@view
+def arbitrary_view(contract_address: address, payload: Bytes[1024]) -> Bytes[1024]:
+    return raw_call(contract_address, payload, is_static_call=True, max_outsize=1024)
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
