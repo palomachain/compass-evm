@@ -24,6 +24,7 @@ struct FeeArgs:
 
 compass: public(address) # compass-evm address
 grain: public(address) # grain token address
+DEPLOYER: immutable(address)
 
 # Rewards program
 rewards_community_balance: public(uint256) # stores the balance attributed to the community wallet
@@ -34,8 +35,8 @@ total_funds: public(uint256) # stores the balance of total user funds # Steven: 
 total_claims: public(uint256) # stores the balance of total claimable rewards # Steven: Why do we need this?
 
 @external
-def __init__(_compass: address, grain: address):
-    self.compass = _compass
+def __init__(grain: address):
+    DEPLOYER = msg.sender
     self.grain = grain
 
 @internal
@@ -146,3 +147,8 @@ def update_compass(_new_compass: address):
     # _new_compass: new compass address
     self.compass_check(self.compass)
     self.compass = _new_compass
+
+@external
+def initialize(_compass: address):
+    assert DEPLOYER == msg.sender and self.compass == empty(address)
+    self.compass = _compass
