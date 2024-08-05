@@ -198,9 +198,9 @@ def deadline_check(deadline: uint256):
     assert block.timestamp <= deadline, "Timeout"
 
 @internal
-def reserve_security_fee(gas_estimate: uint256):
+def reserve_security_fee(relayer: address, gas_estimate: uint256):
     self.gas_check(gas_estimate)
-    FeeManager(FEE_MANAGER).reserve_security_fee(msg.sender, gas_estimate)
+    FeeManager(FEE_MANAGER).reserve_security_fee(relayer, gas_estimate)
 
 @internal
 def check_checkpoint(checkpoint: bytes32):
@@ -214,8 +214,8 @@ def check_checkpoint(checkpoint: bytes32):
 # valset: new validator set to update with
 # consensus: current validator set and signatures
 @external
-def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint256):
-    self.reserve_security_fee(gas_estimate)
+def update_valset(consensus: Consensus, new_valset: Valset, relayer: address, gas_estimate: uint256):
+    self.reserve_security_fee(relayer, gas_estimate)
     # check if new valset_id is greater than current valset_id
     assert new_valset.valset_id > consensus.valset.valset_id, "Invalid Valset ID"
     cumulative_power: uint256 = 0
@@ -231,7 +231,7 @@ def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint25
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # calculate the new checkpoint
     new_checkpoint: bytes32 = self.make_checkpoint(new_valset)
-    args_hash: bytes32 = keccak256(_abi_encode(new_checkpoint, msg.sender, gas_estimate, method_id=method_id("update_valset(bytes32,address,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(new_checkpoint, relayer, gas_estimate, method_id=method_id("update_valset(bytes32,address,uint256)")))
     # check if enough validators signed new validator set (new checkpoint)
     self.check_validator_signatures(consensus, args_hash)
     self.last_checkpoint = new_checkpoint
@@ -243,15 +243,15 @@ def update_valset(consensus: Consensus, new_valset: Valset, gas_estimate: uint25
 # This makes calls to contracts that execute arbitrary logic
 # message_id is to prevent replay attack and every message_id can be used only once
 @external
-def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256):
-    FeeManager(FEE_MANAGER).transfer_fees(fee_args, msg.sender)
+def submit_logic_call(consensus: Consensus, args: LogicCallArgs, fee_args: FeeArgs, message_id: uint256, deadline: uint256, relayer: address):
+    FeeManager(FEE_MANAGER).transfer_fees(fee_args, relayer)
     self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
-    # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(args, fee_args, message_id, compass_id, deadline, msg.sender, method_id=method_id("logic_call((address,bytes),(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
+    # signing data is keccak256 hash of abi_encoded logic_call(args, fee_args, message_id, compass_id, deadline, relayer)
+    args_hash: bytes32 = keccak256(_abi_encode(args, fee_args, message_id, compass_id, deadline, relayer, method_id=method_id("logic_call((address,bytes),(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -278,16 +278,16 @@ def send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
     self._send_token_to_paloma(token, receiver, _balance)
 
 @external
-def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256, gas_estimate: uint256):
-    self.reserve_security_fee(gas_estimate)
+def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batch_id: uint256, deadline: uint256, relayer: address, gas_estimate: uint256):
+    self.reserve_security_fee(relayer, gas_estimate)
     self.deadline_check(deadline)
     assert self.last_batch_id[token] < batch_id, "Wrong batch id"
     length: uint256 = len(args.receiver)
     assert length == len(args.amount), "Unmatched Params"
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
-    # signing data is keccak256 hash of abi_encoded batch_call(args, batch_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, msg.sender, gas_estimate, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256,address,uint256)")))
+    # signing data is keccak256 hash of abi_encoded batch_call(args, batch_id, compass_id, deadline, relayer, gas_estimate)
+    args_hash: bytes32 = keccak256(_abi_encode(token, args, batch_id, compass_id, deadline, relayer, gas_estimate, method_id=method_id("batch_call(address,(address[],uint256[]),uint256,bytes32,uint256,address,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
@@ -371,6 +371,7 @@ def security_fee_topup(amount: uint256):
 # message_id: incremental unused message ID
 # deadline: message deadline
 # receiver: Paloma address to receive the funds
+# relayer: relayer address
 # gas_estimate: gas amount estimation
 # amount: Ete amount to swap and bridge
 # dex: address of the DEX to use for exchanging the Eth
@@ -378,8 +379,8 @@ def security_fee_topup(amount: uint256):
 # min_grain: expected grain amount getting from dex to prevent front-running(high slippage / sandwich attack)
 @external
 @nonreentrant('lock')
-def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, deadline: uint256, receiver: bytes32, gas_estimate: uint256, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
-    self.reserve_security_fee(gas_estimate)
+def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, deadline: uint256, receiver: bytes32, relayer: address, gas_estimate: uint256, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256):
+    self.reserve_security_fee(relayer, gas_estimate)
     self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
     self.message_id_used[message_id] = True
@@ -388,7 +389,7 @@ def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, de
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
 
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(message_id, deadline, receiver, msg.sender, gas_estimate, amount, dex, payload,  min_grain, method_id=method_id("bridge_community_tax_to_paloma(uint256,uint256,byte32,address,uint256,uint256,address,bytes,uint256)")))
+    args_hash: bytes32 = keccak256(_abi_encode(message_id, deadline, receiver, relayer, gas_estimate, amount, dex, payload,  min_grain, method_id=method_id("bridge_community_tax_to_paloma(uint256,uint256,byte32,address,uint256,uint256,address,bytes,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
 
@@ -402,14 +403,15 @@ def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, de
 # deadline: message deadline
 # gas_estimate: gas amount estimation
 # _new_compass: new compass address
+# relayer: relayer address
 @external
-def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint256, gas_estimate: uint256, _new_compass: address):
-    self.reserve_security_fee(gas_estimate)
+def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint256, gas_estimate: uint256, _new_compass: address, relayer: address):
+    self.reserve_security_fee(relayer, gas_estimate)
     self.deadline_check(deadline)
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(deadline, msg.sender, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,address,uint256,address)")))
+    args_hash: bytes32 = keccak256(_abi_encode(deadline, relayer, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,address,uint256,address)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # check if the new compass address is correct
