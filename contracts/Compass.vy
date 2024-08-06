@@ -117,19 +117,6 @@ event NodeSaleEvent:
     nonce: uint256
     event_id: uint256
 
-event FundsDepositedEvent:
-    depositor_paloma_address: bytes32
-    sender: address
-    amount: uint256
-
-event FundsWithdrawnEvent:
-    receiver: address
-    amount: uint256
-
-event UpdateCompassAddressInFeeManager:
-    new_compass: address
-    event_id: uint256
-
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 last_event_id: public(uint256)
