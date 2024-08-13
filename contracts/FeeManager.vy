@@ -35,9 +35,8 @@ total_funds: public(uint256) # stores the balance of total user funds # Steven: 
 total_claims: public(uint256) # stores the balance of total claimable rewards # Steven: Why do we need this?
 
 @external
-def __init__(grain: address):
+def __init__():
     DEPLOYER = msg.sender
-    self.grain = grain
 
 @internal
 def compass_check(_compass: address):
@@ -149,6 +148,7 @@ def update_compass(_new_compass: address):
     self.compass = _new_compass
 
 @external
-def initialize(_compass: address):
+def initialize(_compass: address, _grain: address):
     assert DEPLOYER == msg.sender and self.compass == empty(address)
     self.compass = _compass
+    self.grain = _grain
