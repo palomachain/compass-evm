@@ -148,7 +148,11 @@ def update_compass(_new_compass: address):
     self.compass = _new_compass
 
 @external
-def initialize(_compass: address, _grain: address):
+def initialize_compass(_compass: address):
     assert DEPLOYER == msg.sender and self.compass == empty(address)
     self.compass = _compass
+
+@external
+def initialize_grain(_compass: address, _grain: address):
+    assert DEPLOYER == msg.sender and self.grain == empty(address)
     self.grain = _grain
