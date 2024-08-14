@@ -104,8 +104,9 @@ event FundsWithdrawnEvent:
     receiver: address
     amount: uint256
 
-event UpdateCompassAddressInFeeManager:
-    new_compass: address
+event UpdateCompass:
+    contract_address: address
+    payload: Bytes[MAX_PAYLOAD]
     event_id: uint256
 
 event NodeSaleEvent:
@@ -335,8 +336,8 @@ def arbitrary_view(contract_address: address, payload: Bytes[1024]) -> Bytes[102
 @payable
 @nonreentrant('lock')
 def deposit(depositor_paloma_address: bytes32, amount: uint256):
-    if amount > msg.value:
-        send(msg.sender, unsafe_sub(amount, msg.value))
+    if msg.value > amount:
+        send(msg.sender, unsafe_sub(msg.value, amount))
     else:
         assert amount == msg.value, "Insufficient deposit"
     FeeManager(FEE_MANAGER).deposit(depositor_paloma_address, value=amount)
@@ -398,26 +399,28 @@ def bridge_community_tax_to_paloma(consensus: Consensus, message_id: uint256, de
     grain, grain_balance = FeeManager(FEE_MANAGER).bridge_community_fee_to_paloma(amount, dex, payload, min_grain)
     self._send_token_to_paloma(grain, receiver, grain_balance)
 
-# This function is to update compass address in fee manager contract. After running this function, This Compass-evm can't be used anymore.
+# This function is to update compass address in contracts. After running this function, This Compass-evm can't be used anymore.
 # consensus: current validator set and signatures
+# update_compass_args: array of LogicCallArgs to update compass address in contracts
 # deadline: message deadline
 # gas_estimate: gas amount estimation
-# _new_compass: new compass address
 # relayer: relayer address
+
 @external
-def update_compass_address_in_fee_manager(consensus: Consensus, deadline: uint256, gas_estimate: uint256, _new_compass: address, relayer: address):
+def compass_update_batch(consensus: Consensus, update_compass_args: DynArray[LogicCallArgs, MAX_BATCH], deadline: uint256, gas_estimate: uint256, relayer: address):
     self.reserve_security_fee(relayer, gas_estimate)
     self.deadline_check(deadline)
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded logic_call(args, message_id, compass_id, deadline)
-    args_hash: bytes32 = keccak256(_abi_encode(deadline, relayer, gas_estimate, _new_compass, method_id=method_id("update_compass_address_in_fee_manager(uint256,address,uint256,address)")))
+    args_hash: bytes32 = keccak256(_abi_encode(update_compass_args, deadline, relayer, gas_estimate, method_id=method_id("compass_update_batch((address,bytes)[],uint256,address,uint256)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
-    # check if the new compass address is correct
-    assert Compass(_new_compass).FEE_MANAGER() == FEE_MANAGER, "Wrong new compass address"
-    # make call to logic contract
-    FeeManager(FEE_MANAGER).update_compass(_new_compass)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    for i in range(MAX_BATCH):
+        if i >= len(update_compass_args):
+            break
+        raw_call(update_compass_args[i].logic_contract_address, update_compass_args[i].payload)
+        event_id = unsafe_add(event_id, 1)
+        log UpdateCompass(update_compass_args[0].logic_contract_address, update_compass_args[0].payload, event_id)
     self.last_event_id = event_id
-    log UpdateCompassAddressInFeeManager(_new_compass, event_id)
