@@ -447,6 +447,6 @@ def deploy_contract(consensus: Consensus, _deployer: address, _bytecode: Bytes[2
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
-    child: address = Deployer(deployer_contract).deployFromBytecode(_bytecode)
+    child: address = Deployer(_deployer).deployFromBytecode(_bytecode)
     self.last_event_id = event_id
     log ContractDeployed(child, _deployer, event_id)
