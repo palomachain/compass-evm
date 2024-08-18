@@ -34,6 +34,9 @@ interface FeeManager:
 interface Compass:
     def FEE_MANAGER() -> address: view
 
+interface Deployer:
+    def deployFromBytecode(_bytecode: Bytes[24576]) -> address: nonpayable
+
 struct Valset:
     validators: DynArray[address, MAX_VALIDATORS] # Validator addresses
     powers: DynArray[uint256, MAX_VALIDATORS] # Powers of given validators, in the same order as validators array
@@ -118,6 +121,11 @@ event NodeSaleEvent:
     nonce: uint256
     event_id: uint256
 
+event ContractDeployed:
+    child: address
+    deployer: address
+    event_id: uint256
+
 last_checkpoint: public(bytes32)
 last_valset_id: public(uint256)
 last_event_id: public(uint256)
@@ -130,7 +138,7 @@ FEE_MANAGER: public(immutable(address))
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset, fee_manager: address):
+def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset, fee_manager: address, _deployer_contract: address):
     compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
@@ -424,3 +432,21 @@ def compass_update_batch(consensus: Consensus, update_compass_args: DynArray[Log
         event_id = unsafe_add(event_id, 1)
         log UpdateCompass(update_compass_args[0].logic_contract_address, update_compass_args[0].payload, event_id)
     self.last_event_id = event_id
+
+@external
+def deploy_contract(consensus: Consensus, _deployer: address, _bytecode: Bytes[24576], fee_args: FeeArgs, message_id: uint256, deadline: uint256, relayer: address):
+    FeeManager(FEE_MANAGER).transfer_fees(fee_args, relayer)
+    self.deadline_check(deadline)
+    assert not self.message_id_used[message_id], "Used Message_ID"
+    self.message_id_used[message_id] = True
+    # check if the supplied current validator set matches the saved checkpoint
+    self.check_checkpoint(self.make_checkpoint(consensus.valset))
+    # signing data is keccak256 hash of abi_encoded deploy_contract(bytecode, fee_args, message_id, compass_id, deadline, relayer)
+    args_hash: bytes32 = keccak256(_abi_encode(_deployer, _bytecode, fee_args, message_id, compass_id, deadline, relayer, method_id=method_id("deploy_contract(address,bytes,(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
+    # check if enough validators signed args_hash
+    self.check_validator_signatures(consensus, args_hash)
+    # make call to logic contract
+    event_id: uint256 = unsafe_add(self.last_event_id, 1)
+    child: address = Deployer(_deployer).deployFromBytecode(_bytecode)
+    self.last_event_id = event_id
+    log ContractDeployed(child, _deployer, event_id)

@@ -22,6 +22,40 @@ struct FeeArgs:
     security_fee: uint256 # Total amount to alot for security wallet
     fee_payer_paloma_address: bytes32 # Paloma address covering the fees
 
+event Deposit:
+    depositor_paloma_address: bytes32
+    amount: uint256
+
+event Withdraw:
+    receiver: address
+    amount: uint256
+
+event SecurityFeeTopup:
+    amount: uint256
+
+event FeeTransfer:
+    fee_payer_paloma_address: bytes32
+    community_fee: uint256
+    security_fee: uint256
+    relayer_fee: uint256
+    relayer: address
+
+event ReserveSecurityFee:
+    sender: address
+    gas_fee_amount: uint256
+
+event BridgeCommunityFeeToPaloma:
+    amount: uint256
+
+event UpdateCompass:
+    new_compass: address
+
+event InitializeCompass:
+    compass: address
+
+event InitializeGrain:
+    grain: address
+
 compass: public(address) # compass-evm address
 grain: public(address) # grain token address
 DEPLOYER: immutable(address)
@@ -51,6 +85,7 @@ def deposit(depositor_paloma_address: bytes32):
     self.compass_check(self.compass)
     self.funds[depositor_paloma_address] = unsafe_add(self.funds[depositor_paloma_address], msg.value)
     self.total_funds = unsafe_add(self.total_funds, msg.value)
+    log Deposit(depositor_paloma_address, msg.value)
 
 @internal
 def swap_grain(_grain: address, amount:uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> uint256:
@@ -79,6 +114,7 @@ def withdraw(receiver: address, amount:uint256, dex: address, payload: Bytes[102
     _grain: address = self.grain
     grain_balance: uint256 = self.swap_grain(_grain, amount, dex, payload, min_grain)
     ERC20(_grain).transfer(receiver, grain_balance)
+    log Withdraw(receiver, grain_balance)
 
 @external
 @payable
@@ -87,6 +123,7 @@ def security_fee_topup():
     self.compass_check(_compass)
     # Top up the security wallet with the given amount.
     self.rewards_security_balance = unsafe_add(self.rewards_security_balance, msg.value)
+    log SecurityFeeTopup(msg.value)
 
 @external
 def transfer_fees(fee_args: FeeArgs, relayer: address):
@@ -108,6 +145,7 @@ def transfer_fees(fee_args: FeeArgs, relayer: address):
     self.funds[fee_args.fee_payer_paloma_address] = unsafe_sub(user_remaining_funds, _total_fee)
     self.total_claims = unsafe_add(self.total_claims, _relayer_fee)
     self.total_funds = unsafe_sub(self.total_funds, _total_fee)
+    log FeeTransfer(fee_args.fee_payer_paloma_address, _community_fee, _security_fee, _relayer_fee, relayer)
 
 @external
 def reserve_security_fee(sender: address, gas_fee_amount: uint256):
@@ -122,6 +160,7 @@ def reserve_security_fee(sender: address, gas_fee_amount: uint256):
         self.rewards_security_balance = unsafe_sub(_rewards_security_balance, gas_fee)
         self.claimable_rewards[sender] = unsafe_add(self.claimable_rewards[sender], gas_fee)
         self.total_claims = unsafe_add(self.total_claims, gas_fee)
+        log ReserveSecurityFee(sender, gas_fee_amount)
 
 @external
 def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> uint256:
@@ -138,6 +177,7 @@ def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes
     self.rewards_community_balance = unsafe_sub(_rewards_community_balance, amount)
     grain_balance: uint256 = self.swap_grain(_grain, amount, dex, payload, min_grain)
     ERC20(_grain).transfer(_compass, grain_balance)
+    log BridgeCommunityFeeToPaloma(grain_balance)
     return grain_balance
 
 @external
@@ -146,13 +186,16 @@ def update_compass(_new_compass: address):
     # _new_compass: new compass address
     self.compass_check(self.compass)
     self.compass = _new_compass
+    log UpdateCompass(_new_compass)
 
 @external
 def initialize_compass(_compass: address):
     assert DEPLOYER == msg.sender and self.compass == empty(address)
     self.compass = _compass
+    log InitializeCompass(_compass)
 
 @external
 def initialize_grain(_compass: address, _grain: address):
     assert DEPLOYER == msg.sender and self.grain == empty(address)
     self.grain = _grain
+    log InitializeGrain(_grain)
