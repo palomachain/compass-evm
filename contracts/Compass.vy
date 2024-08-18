@@ -16,7 +16,6 @@ MAX_BATCH: constant(uint256) = 64
 
 POWER_THRESHOLD: constant(uint256) = 2_863_311_530 # 2/3 of 2^32, Validator powers will be normalized to sum to 2 ^ 32 in every valset update.
 compass_id: public(immutable(bytes32))
-deployer_contract: public(immutable(address))
 
 interface ERC20:
     def balanceOf(_owner: address) -> uint256: view
@@ -124,6 +123,7 @@ event NodeSaleEvent:
 
 event ContractDeployed:
     child: address
+    deployer: address
     event_id: uint256
 
 last_checkpoint: public(bytes32)
@@ -155,7 +155,6 @@ def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, v
     self.last_event_id = _event_id
     self.last_gravity_nonce = _gravity_nonce
     FEE_MANAGER = fee_manager
-    deployer_contract = _deployer_contract
     log ValsetUpdated(new_checkpoint, valset.valset_id, _event_id)
 
 # check if cumulated power is enough
@@ -435,7 +434,7 @@ def compass_update_batch(consensus: Consensus, update_compass_args: DynArray[Log
     self.last_event_id = event_id
 
 @external
-def deploy_contract(consensus: Consensus, _bytecode: Bytes[24576], fee_args: FeeArgs, message_id: uint256, deadline: uint256, relayer: address):
+def deploy_contract(consensus: Consensus, _deployer: address, _bytecode: Bytes[24576], fee_args: FeeArgs, message_id: uint256, deadline: uint256, relayer: address):
     FeeManager(FEE_MANAGER).transfer_fees(fee_args, relayer)
     self.deadline_check(deadline)
     assert not self.message_id_used[message_id], "Used Message_ID"
@@ -443,12 +442,11 @@ def deploy_contract(consensus: Consensus, _bytecode: Bytes[24576], fee_args: Fee
     # check if the supplied current validator set matches the saved checkpoint
     self.check_checkpoint(self.make_checkpoint(consensus.valset))
     # signing data is keccak256 hash of abi_encoded deploy_contract(bytecode, fee_args, message_id, compass_id, deadline, relayer)
-    args_hash: bytes32 = keccak256(_abi_encode(_bytecode, fee_args, message_id, compass_id, deadline, relayer,
-        method_id=method_id("deploy_contract(bytes,(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
+    args_hash: bytes32 = keccak256(_abi_encode(_deployer, _bytecode, fee_args, message_id, compass_id, deadline, relayer, method_id=method_id("deploy_contract(address,bytes,(uint256,uint256,uint256,bytes32),uint256,bytes32,uint256,address)")))
     # check if enough validators signed args_hash
     self.check_validator_signatures(consensus, args_hash)
     # make call to logic contract
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     child: address = Deployer(deployer_contract).deployFromBytecode(_bytecode)
     self.last_event_id = event_id
-    log ContractDeployed(child, event_id)
+    log ContractDeployed(child, _deployer, event_id)
