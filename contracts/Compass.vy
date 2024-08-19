@@ -138,7 +138,7 @@ FEE_MANAGER: public(immutable(address))
 # compass_id: unique identifier for compass instance
 # valset: initial validator set
 @external
-def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset, fee_manager: address, _deployer_contract: address):
+def __init__(_compass_id: bytes32, _event_id: uint256, _gravity_nonce:uint256, valset: Valset, fee_manager: address):
     compass_id = _compass_id
     cumulative_power: uint256 = 0
     i: uint256 = 0
