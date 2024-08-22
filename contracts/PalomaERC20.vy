@@ -6,8 +6,11 @@
 @title PalomaERC20
 @license MIT
 @author Volume.Finance
-@notice v1.1.0
+@notice v1.2.0
 """
+
+interface Compass:
+    def slc_switch() -> bool: view
 
 event Transfer:
     _from: indexed(address)
@@ -47,7 +50,7 @@ def totalSupply() -> uint256:
 def transfer(_to: address, _value: uint256) -> bool:
     assert _to != empty(address), "Zero address"
     if msg.sender == self.compass:
-        assert len(msg.data) == 68, "Not available"
+        assert not Compass(msg.sender).slc_switch(), "Not available"
     self.balanceOf[msg.sender] -= _value
     self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
     log Transfer(msg.sender, _to, _value)
@@ -89,9 +92,9 @@ def decreaseAllowance(_spender: address, _value: uint256) -> bool:
 @external
 def new_compass(_compass: address):
     assert msg.sender == self.compass, "Sender is not old compass"
+    assert _compass != empty(address), "Zero address"
+    assert not Compass(msg.sender).slc_switch(), "SLC is unavailable"
     assert _compass != msg.sender, "New address should not be same as the old compass"
-    assert len(msg.data) == 68, "Message length is wrong"
-    assert convert(slice(msg.data, 36, 32), bytes32) == convert(0, bytes32), "Attached Paloma address should be bytes32(0)" # Attached data should be 0x
     self.compass = _compass
     self.balanceOf[_compass] = unsafe_add(self.balanceOf[_compass], self.balanceOf[msg.sender])
     self.balanceOf[msg.sender] = 0
