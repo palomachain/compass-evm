@@ -6,7 +6,7 @@
 @title PalomaERC20
 @license MIT
 @author Volume.Finance
-@notice v1.2.0
+@notice v1.3.0
 """
 
 interface Compass:
@@ -30,7 +30,7 @@ name: public(String[64])
 symbol: public(String[32])
 decimals: public(uint8)
 compass: public(address)
-balanceOf: public(HashMap[address, uint256])
+balance_of: HashMap[address, uint256]
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 @external
@@ -39,28 +39,37 @@ def __init__(_compass: address, _name: String[64], _symbol: String[32], _decimal
     self.symbol = _symbol
     self.compass = _compass
     self.decimals = _decimals
-    self.balanceOf[_compass] = max_value(uint256)
+    self.balance_of[_compass] = max_value(uint256)
 
 @external
 @view
 def totalSupply() -> uint256:
-    return unsafe_sub(max_value(uint256), self.balanceOf[self.compass])
+    return unsafe_sub(max_value(uint256), self.balance_of[self.compass])
+
+@external
+@view
+def balanceOf(_owner: address) -> uint256:
+    if _owner != self.compass:
+        return self.balance_of[_owner]
+    else:
+        return 0
+
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
     assert _to != empty(address), "Zero address"
     if msg.sender == self.compass:
         assert not Compass(msg.sender).slc_switch(), "Not available"
-    self.balanceOf[msg.sender] -= _value
-    self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
+    self.balance_of[msg.sender] -= _value
+    self.balance_of[_to] = unsafe_add(self.balance_of[_to], _value)
     log Transfer(msg.sender, _to, _value)
     return True
 
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     assert _to != empty(address), "Zero address"
-    self.balanceOf[_from] -= _value
-    self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
+    self.balance_of[_from] -= _value
+    self.balance_of[_to] = unsafe_add(self.balance_of[_to], _value)
     self.allowance[_from][msg.sender] -= _value
     log Transfer(_from, _to, _value)
     return True
@@ -96,6 +105,6 @@ def new_compass(_compass: address):
     assert not Compass(msg.sender).slc_switch(), "SLC is unavailable"
     assert _compass != msg.sender, "New address should not be same as the old compass"
     self.compass = _compass
-    self.balanceOf[_compass] = unsafe_add(self.balanceOf[_compass], self.balanceOf[msg.sender])
-    self.balanceOf[msg.sender] = 0
+    self.balance_of[_compass] = unsafe_add(self.balance_of[_compass], self.balance_of[msg.sender])
+    self.balance_of[msg.sender] = 0
     log NewCompass(msg.sender, _compass)
