@@ -49,7 +49,7 @@ def totalSupply() -> uint256:
 @external
 @view
 def balanceOf(_owner: address) -> uint256:
-    if _owner != self.compass:
+    if _owner != self.compass or _owner == msg.sender:
         return self.balance_of[_owner]
     else:
         return 0
