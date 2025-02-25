@@ -4,9 +4,9 @@
 
 """
 @title Compass
-@license MIT
+@license Apache 2.0
 @author Volume.Finance
-@notice v2.0.0
+@notice v2.0.1
 """
 
 MAX_VALIDATORS: constant(uint256) = 200
@@ -91,7 +91,7 @@ event BatchSendEvent:
     event_id: uint256
 
 event ERC20DeployedEvent:
-    paloma_denom: String[64]
+    paloma_denom: String[128]
     token_contract: address
     name: String[64]
     symbol: String[32]
@@ -320,7 +320,7 @@ def emit_nodesale_event(buyer: address, paloma: bytes32, node_count: uint256, gr
     log NodeSaleEvent(msg.sender, buyer, paloma, node_count, grain_amount, _nonce, event_id)
 
 @external
-def deploy_erc20(_paloma_denom: String[64], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
+def deploy_erc20(_paloma_denom: String[128], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
     assert msg.sender == self, "Invalid"
     erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
