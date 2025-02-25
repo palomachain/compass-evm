@@ -4,7 +4,7 @@
 
 """
 @title PalomaERC20
-@license MIT
+@license Apache 2.0
 @author Volume.Finance
 @notice v1.3.0
 """

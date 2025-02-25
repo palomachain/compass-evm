@@ -4,7 +4,7 @@
 
 """
 @title Compass Fee Manager
-@license MIT
+@license Apache 2.0
 @author Volume.Finance
 @notice v1.0.0
 """
