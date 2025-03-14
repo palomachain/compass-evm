@@ -6,7 +6,7 @@
 @title Compass
 @license Apache 2.0
 @author Volume.Finance
-@notice v2.0.1
+@notice v2.1.0
 """
 
 MAX_VALIDATORS: constant(uint256) = 200
@@ -19,8 +19,8 @@ compass_id: public(immutable(bytes32))
 
 interface ERC20:
     def balanceOf(_owner: address) -> uint256: view
-    def transfer(_to: address, _value: uint256) -> bool: nonpayable
-    def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
+    def mint(_to: address, _value: uint256): nonpayable
+    def burnFrom(_from: address, _to: address, _value: uint256): nonpayable
 
 interface FeeManager:
     def deposit(depositor_paloma_address: bytes32): payable
@@ -29,10 +29,6 @@ interface FeeManager:
     def security_fee_topup(): payable
     def reserve_security_fee(sender: address, gas_fee_amount: uint256): nonpayable
     def bridge_community_fee_to_paloma(amount: uint256, dex: address, payload: Bytes[1028], min_grain: uint256) -> (address, uint256): nonpayable
-    def update_compass(_new_compass: address): nonpayable
-
-interface Compass:
-    def FEE_MANAGER() -> address: view
 
 interface Deployer:
     def deployFromBytecode(_bytecode: Bytes[24576]) -> address: nonpayable
@@ -282,7 +278,7 @@ def _send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
 @external
 def send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
     _balance: uint256 = ERC20(token).balanceOf(self)
-    assert ERC20(token).transferFrom(msg.sender, self, amount, default_return_value=True), "failed TransferFrom"
+    ERC20(token).burnFrom(msg.sender, self, amount)
     _balance = ERC20(token).balanceOf(self) - _balance
     self._send_token_to_paloma(token, receiver, _balance)
 
@@ -303,7 +299,7 @@ def submit_batch(consensus: Consensus, token: address, args: TokenSendArgs, batc
     for i in range(MAX_BATCH):
         if  i >= length:
             break
-        assert ERC20(token).transfer(args.receiver[i], args.amount[i], default_return_value=True), "failed transfer"
+        ERC20(token).mint(args.receiver[i], args.amount[i])
     _nonce: uint256 = unsafe_add(self.last_gravity_nonce, 1)
     self.last_gravity_nonce = _nonce
     _event_id: uint256 = unsafe_add(self.last_event_id, 1)
@@ -320,9 +316,9 @@ def emit_nodesale_event(buyer: address, paloma: bytes32, node_count: uint256, gr
     log NodeSaleEvent(msg.sender, buyer, paloma, node_count, grain_amount, _nonce, event_id)
 
 @external
-def deploy_erc20(_paloma_denom: String[128], _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
+def deploy_erc20(_paloma_denom: String[128], _compass_provider: address, _name: String[64], _symbol: String[32], _decimals: uint8, _blueprint: address):
     assert msg.sender == self, "Invalid"
-    erc20: address = create_from_blueprint(_blueprint, self, _name, _symbol, _decimals, code_offset=3)
+    erc20: address = create_from_blueprint(_blueprint, _compass_provider, _name, _symbol, _decimals, code_offset=3)
     event_id: uint256 = unsafe_add(self.last_event_id, 1)
     self.last_event_id = event_id
     log ERC20DeployedEvent(_paloma_denom, erc20, _name, _symbol, _decimals, event_id)

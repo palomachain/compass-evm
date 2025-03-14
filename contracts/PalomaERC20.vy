@@ -9,6 +9,9 @@
 @notice v1.3.0
 """
 
+interface CompassAddressProvider:
+    def compass() -> address: view
+
 interface Compass:
     def slc_switch() -> bool: view
 
@@ -22,68 +25,79 @@ event Approval:
     _spender: indexed(address)
     _value: uint256
 
-event NewCompass:
-    _old_compass: address
-    _new_compass: address
-
+COMPASS_ADDRESS_PROVIDER: public(immutable(CompassAddressProvider))
 name: public(String[64])
 symbol: public(String[32])
 decimals: public(uint8)
-compass: public(address)
-balance_of: HashMap[address, uint256]
+totalSupply: public(uint256)
+balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 @external
-def __init__(_compass: address, _name: String[64], _symbol: String[32], _decimals: uint8):
+def __init__(compass_address_provider: address, _name: String[64], _symbol: String[32], _decimals: uint8):
+    COMPASS_ADDRESS_PROVIDER = CompassAddressProvider(compass_address_provider)
     self.name = _name
     self.symbol = _symbol
-    self.compass = _compass
     self.decimals = _decimals
-    self.balance_of[_compass] = max_value(uint256)
-
-@external
-@view
-def totalSupply() -> uint256:
-    return unsafe_sub(max_value(uint256), self.balance_of[self.compass])
-
-@external
-@view
-def balanceOf(_owner: address) -> uint256:
-    if _owner != self.compass or _owner == msg.sender:
-        return self.balance_of[_owner]
-    else:
-        return 0
-
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
     assert _to != empty(address), "Zero address"
-    if msg.sender == self.compass:
-        assert not Compass(msg.sender).slc_switch(), "Not available"
-    self.balance_of[msg.sender] -= _value
-    self.balance_of[_to] = unsafe_add(self.balance_of[_to], _value)
+    compass: address = COMPASS_ADDRESS_PROVIDER.compass()
+    if msg.sender == compass:
+        assert not Compass(msg.sender).slc_switch(), "SLC is not available"
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
     log Transfer(msg.sender, _to, _value)
     return True
 
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     assert _to != empty(address), "Zero address"
-    self.balance_of[_from] -= _value
-    self.balance_of[_to] = unsafe_add(self.balance_of[_to], _value)
+    compass: address = COMPASS_ADDRESS_PROVIDER.compass()
+    if msg.sender == compass:
+        assert not Compass(msg.sender).slc_switch(), "SLC is not available"
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
     self.allowance[_from][msg.sender] -= _value
     log Transfer(_from, _to, _value)
     return True
 
 @external
 def approve(_spender: address, _value: uint256) -> bool:
-    assert _value == 0 or (self.allowance[msg.sender][_spender] == 0 and self.compass != msg.sender), "Not available"
+    assert _value == 0 or (self.allowance[msg.sender][_spender] == 0 and msg.sender != COMPASS_ADDRESS_PROVIDER.compass()), "Not available"
     self.allowance[msg.sender][_spender] = _value
     log Approval(msg.sender, _spender, _value)
     return True
 
 @external
+def mint(_to: address, _value: uint256):
+    assert msg.sender == COMPASS_ADDRESS_PROVIDER.compass(), "Not Compass"
+    assert not Compass(msg.sender).slc_switch(), "SLC is unavailable"
+    self.totalSupply += _value
+    self.balanceOf[_to] = unsafe_add(self.balanceOf[_to], _value)
+    log Transfer(empty(address), _to, _value)
+
+@external
+def burnFrom(_from: address, _value: uint256):
+    compass: address = COMPASS_ADDRESS_PROVIDER.compass()
+    if msg.sender == compass:
+        assert not Compass(msg.sender).slc_switch(), "SLC is not available"
+    self.allowance[_from][msg.sender] -= _value
+    self.balanceOf[_from] -= _value
+    self.totalSupply -= _value
+    log Transfer(_from, empty(address), _value)
+
+@external
+def burn(_value: uint256):
+    self.balanceOf[msg.sender] -= _value
+    self.totalSupply -= _value
+    log Transfer(msg.sender, empty(address), _value)
+
+@external
 def increaseAllowance(_spender: address, _value: uint256) -> bool:
-    assert self.compass != msg.sender, "Not available"
+    compass: address = COMPASS_ADDRESS_PROVIDER.compass()
+    assert compass != msg.sender, "Not available"
     allowance: uint256 = self.allowance[msg.sender][_spender]
     allowance += _value
     self.allowance[msg.sender][_spender] = allowance
@@ -97,14 +111,3 @@ def decreaseAllowance(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = allowance
     log Approval(msg.sender, _spender, allowance)
     return True
-
-@external
-def new_compass(_compass: address):
-    assert msg.sender == self.compass, "Sender is not old compass"
-    assert _compass != empty(address), "Zero address"
-    assert not Compass(msg.sender).slc_switch(), "SLC is unavailable"
-    assert _compass != msg.sender, "New address should not be same as the old compass"
-    self.compass = _compass
-    self.balance_of[_compass] = unsafe_add(self.balance_of[_compass], self.balance_of[msg.sender])
-    self.balance_of[msg.sender] = 0
-    log NewCompass(msg.sender, _compass)
