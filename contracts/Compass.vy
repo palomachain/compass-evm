@@ -277,9 +277,9 @@ def _send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
 
 @external
 def send_token_to_paloma(token: address, receiver: bytes32, amount: uint256):
-    _balance: uint256 = ERC20(token).balanceOf(self)
+    _balance: uint256 = ERC20(token).balanceOf(msg.sender)
     ERC20(token).burnFrom(msg.sender, self, amount)
-    _balance = ERC20(token).balanceOf(self) - _balance
+    _balance -= ERC20(token).balanceOf(msg.sender)
     self._send_token_to_paloma(token, receiver, _balance)
 
 @external
